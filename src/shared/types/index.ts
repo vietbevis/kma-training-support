@@ -7,3 +7,11 @@ export interface IRequest extends Request {
     roles: string[];
   };
 }
+
+export interface IRouteInfo {
+  module: string;
+  controller: string;
+  method: string;
+  path: string;
+  handler: string;
+}

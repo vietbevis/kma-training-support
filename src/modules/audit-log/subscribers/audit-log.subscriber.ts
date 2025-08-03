@@ -1,6 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ClsService } from 'nestjs-cls';
+import { AuditableEntity } from 'src/database/base/auditable.entity';
+import {
+  AuditAction,
+  AuditLogEntity,
+  AuditStatus,
+} from 'src/database/entities/audit-log.entity';
 import { HttpMethod } from 'src/shared/enums/http-method.enum';
 import { MyClsStore } from 'src/shared/interfaces/my-cls-store.interface';
 import {
@@ -14,12 +20,6 @@ import {
   SoftRemoveEvent,
   UpdateEvent,
 } from 'typeorm';
-import { AuditableEntity } from '../../../database/base/auditable.entity';
-import {
-  AuditAction,
-  AuditLogEntity,
-  AuditStatus,
-} from '../../../database/entities/audit-log.entity';
 
 export interface AuditContext {
   userId?: string;
@@ -83,7 +83,7 @@ export class AuditLogSubscriber implements EntitySubscriberInterface {
   }
 
   async afterUpdate(event: UpdateEvent<AuditableEntity>): Promise<void> {
-    this.logger.log('afterUpdate', event.databaseEntity.id);
+    this.logger.log('afterUpdate', event.updatedColumns);
     // try {
     //   const context = this.getAuditContext();
     //   const config = this.getAuditConfig(event.entity);

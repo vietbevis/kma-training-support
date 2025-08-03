@@ -2,17 +2,22 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FacultyDepartmentEntity } from 'src/database/entities/faculty-department.entity';
 import { PermissionEntity } from 'src/database/entities/permission.entity';
 import { RoleEntity } from 'src/database/entities/role.entity';
+import { SystemRole } from 'src/shared/enums/system-role';
 import { In, Like, Repository } from 'typeorm';
 import { CreateRoleDto, GetRolesQueryDto, UpdateRoleDto } from './role.dto';
 
 @Injectable()
 export class RoleService {
+  private readonly logger = new Logger(RoleService.name);
+
   constructor(
     @InjectRepository(RoleEntity)
     private readonly roleRepository: Repository<RoleEntity>,
@@ -191,5 +196,36 @@ export class RoleService {
     await this.roleRepository.save(role);
 
     return await this.findOne(roleId);
+  }
+
+  async syncSystemRole() {
+    try {
+      let systemRole = await this.roleRepository.findOne({
+        where: { name: SystemRole.ADMIN, isSystemRole: true },
+      });
+
+      const permissions = await this.permissionRepository.find();
+
+      if (systemRole) {
+        systemRole.isActive = true;
+        systemRole.description = 'Admin role';
+        systemRole.permissions = permissions;
+      } else {
+        systemRole = this.roleRepository.create({
+          name: SystemRole.ADMIN,
+          description: 'Admin role',
+          isActive: true,
+          isSystemRole: true,
+          permissions,
+        });
+      }
+
+      await this.roleRepository.save(systemRole);
+
+      return true;
+    } catch (error) {
+      this.logger.error(error);
+      throw new InternalServerErrorException('Lỗi khi tạo vai trò hệ thống');
+    }
   }
 }

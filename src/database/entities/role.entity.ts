@@ -24,7 +24,7 @@ export class RoleEntity extends AuditableEntity {
   @Column({ type: 'boolean', name: 'is_system_role', default: false })
   isSystemRole: boolean;
 
-  @Column({ name: 'scope_faculty_department_id' })
+  @Column({ name: 'scope_faculty_department_id', nullable: true })
   scopeFacultyDepartmentId: string;
 
   @ManyToOne(() => FacultyDepartmentEntity)

@@ -13,6 +13,7 @@ import { FacultyDepartmentEntity } from 'src/database/entities/faculty-departmen
 import { RoleEntity } from 'src/database/entities/role.entity';
 import { SubjectEntity } from 'src/database/entities/subject.entity';
 import { UserEntity } from 'src/database/entities/user.entity';
+import { HashingService } from 'src/shared/services/hashing.service';
 import { In, IsNull, Like, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateUserDto,
@@ -38,6 +39,7 @@ export class UserService {
     private readonly exemptionPercentageRepository: Repository<ExemptionPercentageEntity>,
     @InjectRepository(RoleEntity)
     private readonly roleRepository: Repository<RoleEntity>,
+    private readonly hashingService: HashingService,
   ) {}
 
   async create(createUserDto: CreateUserDto) {
@@ -115,30 +117,25 @@ export class UserService {
         }
       }
 
-      // Kiểm tra roleIds có tồn tại không (nếu có)
-      if (createUserDto.roleIds && createUserDto.roleIds.length > 0) {
+      const user = this.userRepository.create({
+        ...createUserDto,
+        password: this.hashingService.hash(createUserDto.password),
+      });
+
+      // Xử lý roles nếu có
+      const roleIdsSet = new Set(createUserDto.roleIds);
+      if (roleIdsSet.size > 0) {
         const roles = await this.roleRepository.find({
           where: {
-            id: In(createUserDto.roleIds),
+            id: In(Array.from(roleIdsSet)),
           },
         });
-        if (roles.length !== createUserDto.roleIds.length) {
+        if (roles.length !== roleIdsSet.size) {
           throw new NotFoundException({
             statusCode: HttpStatus.NOT_FOUND,
             message: 'Một số vai trò không tồn tại',
           });
         }
-      }
-
-      const user = this.userRepository.create(createUserDto);
-
-      // Xử lý roles nếu có
-      if (createUserDto.roleIds && createUserDto.roleIds.length > 0) {
-        const roles = await this.roleRepository.find({
-          where: {
-            id: In(createUserDto.roleIds),
-          },
-        });
         user.roles = roles;
       }
 
@@ -181,29 +178,15 @@ export class UserService {
       } = queryDto;
       const skip = (page - 1) * limit;
 
-      const whereCondition: any = {
-        facultyDepartmentId: facultyDepartmentId || undefined,
-        subjectId: subjectId || undefined,
-        academicCredentialId: academicCredentialId || undefined,
-        gender: gender || undefined,
-        areTeaching: areTeaching !== undefined ? areTeaching : undefined,
-      };
-
-      if (search) {
-        whereCondition.fullName = Like(`%${search}%`);
-        // Hoặc tìm trong code và username
-        // whereCondition.code = Like(`%${search}%`);
-        // whereCondition.username = Like(`%${search}%`);
-      }
-
-      Object.keys(whereCondition).forEach((key) => {
-        if (whereCondition[key] === undefined) {
-          delete whereCondition[key];
-        }
-      });
-
       const [data, total] = await this.userRepository.findAndCount({
-        where: whereCondition,
+        where: {
+          facultyDepartmentId: facultyDepartmentId || undefined,
+          subjectId: subjectId || undefined,
+          academicCredentialId: academicCredentialId || undefined,
+          gender: gender || undefined,
+          areTeaching: areTeaching !== undefined ? areTeaching : undefined,
+          fullName: search ? Like(`%${search}%`) : undefined,
+        },
         skip,
         take: limit,
         order: {
@@ -356,13 +339,14 @@ export class UserService {
       }
 
       // Kiểm tra roleIds có tồn tại không (nếu có cập nhật)
-      if (updateUserDto.roleIds && updateUserDto.roleIds.length > 0) {
+      const roleIdsSet = new Set(updateUserDto.roleIds);
+      if (roleIdsSet.size > 0) {
         const roles = await this.roleRepository.find({
           where: {
-            id: In(updateUserDto.roleIds),
+            id: In(Array.from(roleIdsSet)),
           },
         });
-        if (roles.length !== updateUserDto.roleIds.length) {
+        if (roles.length !== roleIdsSet.size) {
           throw new NotFoundException({
             statusCode: HttpStatus.NOT_FOUND,
             message: 'Một số vai trò không tồn tại',
@@ -372,6 +356,18 @@ export class UserService {
       }
 
       Object.assign(user, updateUserDto);
+
+      // Kiểm tra password có tồn tại không (nếu có cập nhật)
+      // Nếu có thì có thay đổi không
+      if (updateUserDto.password) {
+        const isPasswordChanged = this.hashingService.compare(
+          updateUserDto.password,
+          user.password,
+        );
+        if (!isPasswordChanged) {
+          user.password = this.hashingService.hash(updateUserDto.password);
+        }
+      }
 
       const updatedUser = await this.userRepository.save(user);
 
@@ -469,27 +465,16 @@ export class UserService {
       } = queryDto;
       const skip = (page - 1) * limit;
 
-      const whereCondition: any = {
-        facultyDepartmentId: facultyDepartmentId || undefined,
-        subjectId: subjectId || undefined,
-        academicCredentialId: academicCredentialId || undefined,
-        gender: gender || undefined,
-        areTeaching: areTeaching !== undefined ? areTeaching : undefined,
-        deletedAt: Not(IsNull()),
-      };
-
-      if (search) {
-        whereCondition.fullName = Like(`%${search}%`);
-      }
-
-      Object.keys(whereCondition).forEach((key) => {
-        if (whereCondition[key] === undefined) {
-          delete whereCondition[key];
-        }
-      });
-
       const [data, total] = await this.userRepository.findAndCount({
-        where: whereCondition,
+        where: {
+          facultyDepartmentId: facultyDepartmentId || undefined,
+          subjectId: subjectId || undefined,
+          academicCredentialId: academicCredentialId || undefined,
+          gender: gender || undefined,
+          areTeaching: areTeaching !== undefined ? areTeaching : undefined,
+          deletedAt: Not(IsNull()),
+          fullName: search ? Like(`%${search}%`) : undefined,
+        },
         skip,
         take: limit,
         order: {

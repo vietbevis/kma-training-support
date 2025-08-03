@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
+import { AuditableEntity } from 'src/database/base/auditable.entity';
 import { MyClsStore } from 'src/shared/interfaces/my-cls-store.interface';
 import {
   DataSource,
@@ -8,7 +9,6 @@ import {
   InsertEvent,
   UpdateEvent,
 } from 'typeorm';
-import { AuditableEntity } from '../../../database/base/auditable.entity';
 
 @Injectable()
 @EventSubscriber()

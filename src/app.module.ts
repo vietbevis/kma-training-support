@@ -9,6 +9,7 @@ import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 import { AcademicCredentialModule } from './modules/academic-credential/academic-credential.module';
 import { AcademicYearsModule } from './modules/academic-years/academic-years.module';
+import { AccountModule } from './modules/account/account.module';
 import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { BuildingModule } from './modules/building/building.module';
 import { ClassroomModule } from './modules/classroom/classroom.module';
@@ -46,6 +47,7 @@ import { SharedModule } from './shared/shared.module';
     StandardLectureHoursModule,
     ExemptionPercentageModule,
     UserModule,
+    AccountModule,
   ],
   controllers: [AppController],
   providers: [

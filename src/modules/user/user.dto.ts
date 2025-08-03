@@ -1,4 +1,4 @@
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
@@ -250,7 +250,240 @@ export class CreateUserDto {
   roleIds?: string[];
 }
 
-export class UpdateUserDto extends PartialType(CreateUserDto) {}
+export class UpdateUserDto {
+  @ApiProperty({
+    description: 'Họ và tên',
+    example: 'Nguyễn Văn A',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  fullName?: string;
+
+  @ApiProperty({
+    description: 'Mã nhân viên',
+    example: 'NV001',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  code?: string;
+
+  @ApiProperty({
+    description: 'Mật khẩu',
+    example: 'password123',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  password?: string;
+
+  @ApiProperty({
+    description: 'Giới tính',
+    enum: Gender,
+    example: Gender.MALE,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
+
+  @ApiProperty({
+    description: 'Ngày sinh',
+    example: '1990-01-01',
+    required: false,
+  })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  dateOfBirth?: Date;
+
+  @ApiProperty({
+    description: 'Số điện thoại',
+    example: '0123456789',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @ApiProperty({
+    description: 'Email',
+    example: 'nguyenvana@example.com',
+    required: false,
+  })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiProperty({
+    description: 'Nơi công tác',
+    example: 'Trường Đại học ABC',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  workPlace?: string;
+
+  @ApiProperty({
+    description: 'Căn cước công dân',
+    example: '123456789012',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  citizenId?: string;
+
+  @ApiProperty({
+    description: 'Ngày cấp CCCD',
+    example: '2020-01-01',
+    required: false,
+  })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  citizenIdIssueDate?: Date;
+
+  @ApiProperty({
+    description: 'Nơi cấp CCCD',
+    example: 'Công an quận 1, TP.HCM',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  citizenIdIssuePlace?: string;
+
+  @ApiProperty({
+    description: 'Địa chỉ trên CCCD',
+    example: '123 Đường ABC, Quận 1, TP.HCM',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  citizenIdAddress?: string;
+
+  @ApiProperty({
+    description: 'Địa chỉ hiện tại',
+    example: '456 Đường XYZ, Quận 2, TP.HCM',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  currentAddress?: string;
+
+  @ApiProperty({
+    description: 'Tình trạng giảng dạy',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  areTeaching?: boolean;
+
+  @ApiProperty({
+    description: 'Hệ số lương',
+    example: 2.5,
+    required: false,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  salaryCoefficient?: number;
+
+  @ApiProperty({
+    description: 'Lương',
+    example: 5000000,
+    required: false,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  salary?: number;
+
+  @ApiProperty({
+    description: 'Chức vụ',
+    example: 'Giảng viên',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  position?: string;
+
+  @ApiProperty({
+    description: 'Số tài khoản',
+    example: '1234567890',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  bankAccount?: string;
+
+  @ApiProperty({
+    description: 'Tên ngân hàng',
+    example: 'Vietcombank',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  bankName?: string;
+
+  @ApiProperty({
+    description: 'Chi nhánh ngân hàng',
+    example: 'Chi nhánh TP.HCM',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  bankBranch?: string;
+
+  @ApiProperty({
+    description: 'ID phần trăm miễn giảm',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID()
+  exemptionPercentageId?: string;
+
+  @ApiProperty({
+    description: 'ID bộ môn (bắt buộc nếu thuộc khoa)',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID()
+  subjectId?: string;
+
+  @ApiProperty({
+    description: 'ID học hàm/học vị',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID()
+  academicCredentialId?: string;
+
+  @ApiProperty({
+    description: 'ID phòng ban/khoa',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID()
+  facultyDepartmentId?: string;
+
+  @ApiProperty({
+    description: 'ID các vai trò',
+    example: ['123e4567-e89b-12d3-a456-426614174000'],
+    required: false,
+  })
+  @IsOptional()
+  @IsUUID('4', { each: true })
+  roleIds?: string[];
+}
 
 export class QueryUserDto {
   @ApiProperty({
