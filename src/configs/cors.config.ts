@@ -3,7 +3,13 @@ import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.int
 import { ConfigService } from 'src/shared/services/config.service';
 
 export const corsConfig = (configService: ConfigService): CorsOptions => {
-  const whitelist = [configService.get('API_URL')];
+  const whitelist = [
+    configService.get('API_URL'),
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:5173',
+    'http://localhost:5174',
+  ];
   return {
     origin: (origin: string, callback: Function) => {
       if (!origin || whitelist.includes(origin)) {
