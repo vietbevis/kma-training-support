@@ -7,7 +7,7 @@ export const configSwagger = (
   configService: ConfigService,
 ) => {
   const API_URL = configService.get('API_URL');
-  const SWAGGER_UI_ENABLED = configService.isDevelopment;
+  const SWAGGER_UI_ENABLED = true;
   const SWAGGER_TITLE = configService.get('SWAGGER_TITLE');
   const SWAGGER_DESCRIPTION = configService.get('SWAGGER_DESCRIPTION');
   const SWAGGER_VERSION = configService.get('SWAGGER_VERSION');
