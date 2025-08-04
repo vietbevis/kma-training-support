@@ -7,7 +7,7 @@ import { UserEntity } from 'src/database/entities/user.entity';
 import { ConfigService } from 'src/shared/services/config.service';
 import { HashingService } from 'src/shared/services/hashing.service';
 import { RsaKeyManager } from 'src/shared/utils/RsaKeyManager';
-import { MoreThan, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { LoginDto, RefreshTokenDto } from './auth.dto';
 
 @Injectable()
@@ -59,7 +59,6 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: this.configService.get('ACCESS_TOKEN_EXPIRES_IN'),
     };
   }
 
@@ -72,20 +71,14 @@ export class AuthService {
 
     try {
       // Verify refresh token
-      const payload = jwt.verify(
-        refreshToken,
-        this.keyManager.getPublicKeyRefresh(),
-        {
-          algorithms: ['RS256'],
-        },
-      ) as { sub: string; jti: string };
+      jwt.verify(refreshToken, this.keyManager.getPublicKeyRefresh(), {
+        algorithms: ['RS256'],
+      });
 
       // Kiểm tra refresh token trong database
       const storedToken = await this.refreshTokenRepository.findOne({
         where: {
           token: this.hashToken(refreshToken),
-          isRevoked: false,
-          expiresAt: MoreThan(new Date()),
         },
         relations: {
           user: {
@@ -94,7 +87,11 @@ export class AuthService {
         },
       });
 
-      if (!storedToken) {
+      if (
+        !storedToken ||
+        storedToken.isRevoked ||
+        storedToken.expiresAt < new Date()
+      ) {
         throw new UnauthorizedException(
           'Refresh token không hợp lệ hoặc đã hết hạn',
         );
@@ -117,9 +114,24 @@ export class AuthService {
       return {
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
-        expiresIn: this.configService.get('ACCESS_TOKEN_EXPIRES_IN'),
       };
     } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new UnauthorizedException(
+          'Refresh token đã hết hạn, vui lòng đăng nhập lại',
+        );
+      }
+
+      if (error instanceof jwt.JsonWebTokenError) {
+        throw new UnauthorizedException(
+          'Refresh token không hợp lệ, vui lòng đăng nhập lại',
+        );
+      }
+
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
       this.logger.error('Refresh token verification failed:', error);
       throw new UnauthorizedException('Refresh token không hợp lệ');
     }
@@ -184,7 +196,7 @@ export class AuthService {
       token: this.hashToken(refreshToken),
       userId: user.id,
       expiresAt: new Date(
-        Date.now() + this.configService.get('REFRESH_TOKEN_EXPIRES_IN'),
+        Date.now() + this.configService.get('REFRESH_TOKEN_EXPIRES_IN') * 1000,
       ),
       ipAddress,
       userAgent,

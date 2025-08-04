@@ -41,12 +41,6 @@ export class LoginResponseDto {
     example: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   refreshToken: string;
-
-  @ApiProperty({
-    description: 'Thời gian hết hạn access token (giây)',
-    example: 3600,
-  })
-  expiresIn: number;
 }
 
 export class RefreshTokenResponseDto {
@@ -61,12 +55,6 @@ export class RefreshTokenResponseDto {
     example: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   refreshToken: string;
-
-  @ApiProperty({
-    description: 'Thời gian hết hạn access token (giây)',
-    example: 3600,
-  })
-  expiresIn: number;
 }
 
 export class LogoutResponseDto {
