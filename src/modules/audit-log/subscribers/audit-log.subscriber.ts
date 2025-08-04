@@ -9,6 +9,7 @@ import {
 } from 'src/database/entities/audit-log.entity';
 import { HttpMethod } from 'src/shared/enums/http-method.enum';
 import { MyClsStore } from 'src/shared/interfaces/my-cls-store.interface';
+import { IRequest } from 'src/shared/types';
 import {
   DataSource,
   EntitySubscriberInterface,
@@ -22,7 +23,7 @@ import {
 } from 'typeorm';
 
 export interface AuditContext {
-  userId?: string;
+  user?: IRequest['user'];
   ipAddress?: string;
   userAgent?: string;
   requestId?: string;
@@ -61,126 +62,17 @@ export class AuditLogSubscriber implements EntitySubscriberInterface {
     return AuditableEntity;
   }
 
-  async afterInsert(event: InsertEvent<AuditableEntity>): Promise<void> {
-    this.logger.log('afterInsert', event.entityId);
-    // try {
-    //   const context = this.getAuditContext();
-    //   const config = this.getAuditConfig(event.entity);
+  async afterInsert(event: InsertEvent<AuditableEntity>): Promise<void> {}
 
-    //   const auditLog = this.createAuditLog({
-    //     action: AuditAction.CREATE,
-    //     entityName: event.metadata.tableName,
-    //     entityId: this.getEntityId(event.entity),
-    //     newValues: this.sanitizeValues(event.entity, config),
-    //     context,
-    //     config,
-    //   });
+  async afterUpdate(event: UpdateEvent<AuditableEntity>): Promise<void> {}
 
-    //   await this.saveAudit(auditLog, config);
-    // } catch (error) {
-    //   this.logger.error('Error in afterInsert audit:', error);
-    // }
-  }
-
-  async afterUpdate(event: UpdateEvent<AuditableEntity>): Promise<void> {
-    this.logger.log('afterUpdate', event.updatedColumns);
-    // try {
-    //   const context = this.getAuditContext();
-    //   const config = this.getAuditConfig(event.entity);
-
-    //   const oldValues = event.databaseEntity || {};
-    //   const newValues = event.entity || {};
-
-    //   const changedFields = this.getChangedFields(oldValues, newValues, config);
-
-    //   if (changedFields.length === 0) return;
-
-    //   const auditLog = this.createAuditLog({
-    //     action: AuditAction.UPDATE,
-    //     entityName: event.metadata.tableName,
-    //     entityId: this.getEntityId(event.entity),
-    //     oldValues: this.sanitizeValues(oldValues, config),
-    //     newValues: this.sanitizeValues(newValues, config),
-    //     changedFields,
-    //     context,
-    //     config,
-    //   });
-
-    //   await this.saveAudit(auditLog, config);
-    // } catch (error) {
-    //   this.logger.error('Error in afterUpdate audit:', error);
-    // }
-  }
-
-  async afterRemove(event: RemoveEvent<AuditableEntity>): Promise<void> {
-    this.logger.log('afterRemove', event.entityId);
-    // try {
-    //   const context = this.getAuditContext();
-    //   const config = this.getAuditConfig(event.entity);
-
-    //   const auditLog = this.createAuditLog({
-    //     action: AuditAction.DELETE,
-    //     entityName: event.metadata.tableName,
-    //     entityId: this.getEntityId(event.entity || event.databaseEntity),
-    //     oldValues: this.sanitizeValues(
-    //       event.entity || event.databaseEntity,
-    //       config,
-    //     ),
-    //     context,
-    //     config,
-    //   });
-
-    //   await this.saveAudit(auditLog, config);
-    // } catch (error) {
-    //   this.logger.error('Error in afterRemove audit:', error);
-    // }
-  }
+  async afterRemove(event: RemoveEvent<AuditableEntity>): Promise<void> {}
 
   async afterSoftRemove(
     event: SoftRemoveEvent<AuditableEntity>,
-  ): Promise<void> {
-    this.logger.log('afterSoftRemove', event.entityId);
-    // try {
-    //   const context = this.getAuditContext();
-    //   const config = this.getAuditConfig(event.entity);
+  ): Promise<void> {}
 
-    //   const auditLog = this.createAuditLog({
-    //     action: AuditAction.SOFT_DELETE,
-    //     entityName: event.metadata.tableName,
-    //     entityId: this.getEntityId(event.entity),
-    //     oldValues: this.sanitizeValues(event.databaseEntity, config),
-    //     newValues: this.sanitizeValues(event.entity, config),
-    //     context,
-    //     config,
-    //   });
-
-    //   await this.saveAudit(auditLog, config);
-    // } catch (error) {
-    //   this.logger.error('Error in afterSoftRemove audit:', error);
-    // }
-  }
-
-  async afterRecover(event: RecoverEvent<AuditableEntity>): Promise<void> {
-    this.logger.log('afterRecover', event.entityId);
-    // try {
-    //   const context = this.getAuditContext();
-    //   const config = this.getAuditConfig(event.entity);
-
-    //   const auditLog = this.createAuditLog({
-    //     action: AuditAction.RESTORE,
-    //     entityName: event.metadata.tableName,
-    //     entityId: String(event.entity.id),
-    //     oldValues: this.sanitizeValues(event.databaseEntity, config),
-    //     newValues: this.sanitizeValues(event.entity, config),
-    //     context,
-    //     config,
-    //   });
-
-    //   await this.saveAudit(auditLog, config);
-    // } catch (error) {
-    //   this.logger.error('Error in afterRecover audit:', error);
-    // }
-  }
+  async afterRecover(event: RecoverEvent<AuditableEntity>): Promise<void> {}
 
   private createAuditLog(params: {
     action: AuditAction;
@@ -206,7 +98,7 @@ export class AuditLogSubscriber implements EntitySubscriberInterface {
       entityName,
       entityId,
       status: AuditStatus.SUCCESS,
-      userId: context.userId,
+      userId: context.user?.id,
       ipAddress: context.ipAddress,
       userAgent: context.userAgent,
       httpMethod: context.httpMethod as HttpMethod,

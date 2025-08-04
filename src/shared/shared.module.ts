@@ -8,8 +8,9 @@ import { AuthGuard } from './guards/auth.guard';
 import { ApiValidationPipe } from './pipes/validation.pipe';
 import { ConfigService } from './services/config.service';
 import { HashingService } from './services/hashing.service';
+import { RsaKeyManager } from './utils/RsaKeyManager';
 
-const services = [ConfigService, HashingService];
+const services = [ConfigService, HashingService, RsaKeyManager];
 
 @Global()
 @Module({

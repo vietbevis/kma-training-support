@@ -3,8 +3,18 @@ import { Request } from 'express';
 export interface IRequest extends Request {
   user: {
     id: string;
-    email: string;
-    roles: string[];
+    username: string;
+    fullName: string;
+    roles: {
+      id: string;
+      name: string;
+      isActive: boolean;
+      isSystemRole: boolean;
+      scopeFacultyDepartment: {
+        id: string;
+        name: string;
+      };
+    }[];
   };
 }
 

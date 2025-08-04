@@ -4,13 +4,14 @@ import {
   Module,
   NestModule,
 } from '@nestjs/common';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { DatabaseModule } from './database/database.module';
 import { AcademicCredentialModule } from './modules/academic-credential/academic-credential.module';
 import { AcademicYearsModule } from './modules/academic-years/academic-years.module';
 import { AccountModule } from './modules/account/account.module';
 import { AuditLogModule } from './modules/audit-log/audit-log.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { BuildingModule } from './modules/building/building.module';
 import { ClassroomModule } from './modules/classroom/classroom.module';
 import { CourseModule } from './modules/course/course.module';
@@ -23,6 +24,7 @@ import { RoleModule } from './modules/role/role.module';
 import { StandardLectureHoursModule } from './modules/standard-lecture-hours/standard-lecture-hours.module';
 import { SubjectModule } from './modules/subject/subject.module';
 import { UserModule } from './modules/user/user.module';
+import { JwtGuard } from './shared/guards/jwt.guard';
 import { CompressionMiddleware } from './shared/middlewares/compression.middleware';
 import { HelmetMiddleware } from './shared/middlewares/helmet.middleware';
 import { MorganMiddleware } from './shared/middlewares/morgan.middleware';
@@ -48,12 +50,17 @@ import { SharedModule } from './shared/shared.module';
     ExemptionPercentageModule,
     UserModule,
     AccountModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [
     {
       provide: APP_INTERCEPTOR,
       useClass: ClassSerializerInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: JwtGuard,
     },
   ],
 })

@@ -30,12 +30,12 @@ export class AuditableSubscriber
   }
 
   beforeInsert(event: InsertEvent<AuditableEntity>) {
-    event.entity.createdById = this.cls.get('auditContext.userId') ?? null;
+    event.entity.createdById = this.cls.get('auditContext.user.id') ?? null;
   }
 
   beforeUpdate(event: UpdateEvent<AuditableEntity>) {
     if (event.entity) {
-      event.entity.updatedById = this.cls.get('auditContext.userId') ?? null;
+      event.entity.updatedById = this.cls.get('auditContext.user.id') ?? null;
     }
   }
 }

@@ -1,7 +1,7 @@
-import { BadRequestException, Injectable, LoggerService } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { generateKeyPairSync } from 'crypto';
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ConfigService } from '../services/config.service';
 
 const KeyType = {
@@ -27,10 +27,9 @@ export class RsaKeyManager {
   public privateKeyRefresh!: string;
   public publicKeyRefresh!: string;
 
-  constructor(
-    private readonly logger: LoggerService,
-    private readonly configService: ConfigService,
-  ) {
+  private readonly logger = new Logger(RsaKeyManager.name);
+
+  constructor(private readonly configService: ConfigService) {
     this.keyDirectory = this.configService.get('JWT_KEY_DIRECTORY') || './keys';
     this.privateKeyAccessFilename =
       this.configService.get('JWT_PRIVATE_ACCESS') || 'private_key_access.pem';

@@ -18,14 +18,24 @@ export class AuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request: IRequest = context.switchToHttp().getRequest();
 
-    const user = request.user || { id: null, email: null, role: null };
+    const user = request.user || {
+      id: null,
+      username: null,
+      fullName: null,
+      roles: null,
+    };
 
     const auditContext: AuditContext = {
-      userId: user.id,
+      user: {
+        id: user.id,
+        username: user.username,
+        fullName: user.fullName,
+        roles: user.roles,
+      },
       ipAddress: request.ip,
       userAgent: request.get('user-agent'),
       httpMethod: request.method,
-      endpoint: request.url,
+      endpoint: request.route.path,
     };
 
     this.cls.set('auditContext', auditContext);

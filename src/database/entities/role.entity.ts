@@ -31,7 +31,7 @@ export class RoleEntity extends AuditableEntity {
   @JoinColumn({ name: 'scope_faculty_department_id' })
   scopeFacultyDepartment: FacultyDepartmentEntity;
 
-  @ManyToMany(() => PermissionEntity)
+  @ManyToMany(() => PermissionEntity, (permission) => permission.roles)
   @JoinTable({ name: 'tbl_role_permissions' })
   permissions: PermissionEntity[];
 }

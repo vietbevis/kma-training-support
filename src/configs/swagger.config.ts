@@ -18,8 +18,32 @@ export const configSwagger = (
     .setDescription(SWAGGER_DESCRIPTION)
     .setVersion(SWAGGER_VERSION)
     .addServer(API_URL)
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        description: 'JWT Authorization header using the Bearer scheme',
+      },
+      'Authorization',
+    )
     .build();
   const documentSwagger = SwaggerModule.createDocument(app, configSwagger);
+
+  documentSwagger.paths = Object.entries(documentSwagger.paths).reduce(
+    (acc, [path, pathObj]) => {
+      for (const method in pathObj) {
+        if (pathObj[method]?.security === undefined) {
+          pathObj[method].security = [{ Authorization: [] }];
+        }
+      }
+      acc[path] = pathObj;
+      return acc;
+    },
+    {} as typeof documentSwagger.paths,
+  );
+
   SwaggerModule.setup(SWAGGER_UI_PATH, app, documentSwagger, {
     swaggerOptions: {
       persistAuthorization: true,

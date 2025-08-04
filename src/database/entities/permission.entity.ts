@@ -21,6 +21,6 @@ export class PermissionEntity extends AuditableEntity {
   @Column({ type: 'varchar' })
   module: string;
 
-  @ManyToMany(() => RoleEntity)
+  @ManyToMany(() => RoleEntity, (role) => role.permissions)
   roles: RoleEntity[];
 }
