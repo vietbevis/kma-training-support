@@ -159,11 +159,15 @@ export class SubjectService {
       const subject = await this.findOne(id);
 
       if (updateSubjectDto.facultyDepartmentId) {
-        await this.validateFaculty(updateSubjectDto.facultyDepartmentId);
+        subject.facultyDepartment = await this.validateFaculty(
+          updateSubjectDto.facultyDepartmentId,
+        );
       }
 
       if (updateSubjectDto.headOfDepartmentId) {
-        await this.validateUser(updateSubjectDto.headOfDepartmentId);
+        subject.headOfDepartment = await this.validateUser(
+          updateSubjectDto.headOfDepartmentId,
+        );
       }
 
       Object.assign(subject, updateSubjectDto);
