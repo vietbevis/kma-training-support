@@ -29,6 +29,7 @@ import { CompressionMiddleware } from './shared/middlewares/compression.middlewa
 import { HelmetMiddleware } from './shared/middlewares/helmet.middleware';
 import { MorganMiddleware } from './shared/middlewares/morgan.middleware';
 import { SharedModule } from './shared/shared.module';
+import { FilesModule } from './modules/files/files.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { SharedModule } from './shared/shared.module';
     UserModule,
     AccountModule,
     AuthModule,
+    FilesModule,
   ],
   controllers: [AppController],
   providers: [

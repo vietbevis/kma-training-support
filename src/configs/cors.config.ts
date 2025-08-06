@@ -24,7 +24,7 @@ export const corsConfig = (configService: ConfigService): CorsOptions => {
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin'],
-    exposedHeaders: ['Authorization'],
+    exposedHeaders: ['Authorization', 'Content-Disposition'],
     credentials: true,
     optionsSuccessStatus: 204,
     maxAge: 3600,

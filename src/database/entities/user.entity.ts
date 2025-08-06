@@ -102,6 +102,20 @@ export class UserEntity extends AuditableEntity {
   citizenIdIssuePlace?: string;
 
   @Column({
+    name: 'citizen_id_font',
+    nullable: true,
+    comment: 'Tệp hình ảnh CCCD trước',
+  })
+  citizenIdFont?: string;
+
+  @Column({
+    name: 'citizen_id_back',
+    nullable: true,
+    comment: 'Tệp hình ảnh CCCD sau',
+  })
+  citizenIdBack?: string;
+
+  @Column({
     name: 'citizen_id_address',
     type: 'text',
     nullable: true,
@@ -169,6 +183,20 @@ export class UserEntity extends AuditableEntity {
     comment: 'Chi nhánh',
   })
   bankBranch: string;
+
+  @Column({
+    name: 'tax_code',
+    nullable: true,
+    comment: 'Mã số thuế',
+  })
+  taxCode: string;
+
+  @Column({
+    name: 'profile_file',
+    nullable: true,
+    comment: 'Tệp lí lịch cá nhân',
+  })
+  profileFile: string;
 
   @Column({
     name: 'exemption_percentage_id',

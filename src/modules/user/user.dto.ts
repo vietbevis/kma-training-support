@@ -124,6 +124,24 @@ export class CreateUserDto {
   citizenIdIssuePlace?: string;
 
   @ApiProperty({
+    description: 'Tệp hình ảnh CCCD trước',
+    example: '123456789012',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  citizenIdFont?: string;
+
+  @ApiProperty({
+    description: 'Tệp hình ảnh CCCD sau',
+    example: '123456789012',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  citizenIdBack?: string;
+
+  @ApiProperty({
     description: 'Địa chỉ trên CCCD',
     example: '123 Đường ABC, Quận 1, TP.HCM',
     required: false,
@@ -205,6 +223,24 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   bankBranch?: string;
+
+  @ApiProperty({
+    description: 'Mã số thuế',
+    example: '1234567890',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  taxCode?: string;
+
+  @ApiProperty({
+    description: 'Tệp lí lịch cá nhân',
+    example: '123456789012',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  profileFile?: string;
 
   @ApiProperty({
     description: 'ID phần trăm miễn giảm',
@@ -357,6 +393,24 @@ export class UpdateUserDto {
   citizenIdIssuePlace?: string;
 
   @ApiProperty({
+    description: 'Tệp hình ảnh CCCD trước',
+    example: '123456789012',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  citizenIdFont?: string;
+
+  @ApiProperty({
+    description: 'Tệp hình ảnh CCCD sau',
+    example: '123456789012',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  citizenIdBack?: string;
+
+  @ApiProperty({
     description: 'Địa chỉ trên CCCD',
     example: '123 Đường ABC, Quận 1, TP.HCM',
     required: false,
@@ -438,6 +492,24 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   bankBranch?: string;
+
+  @ApiProperty({
+    description: 'Mã số thuế',
+    example: '1234567890',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  taxCode?: string;
+
+  @ApiProperty({
+    description: 'Tệp lí lịch cá nhân',
+    example: '123456789012',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  profileFile?: string;
 
   @ApiProperty({
     description: 'ID phần trăm miễn giảm',
