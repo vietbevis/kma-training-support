@@ -6,13 +6,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { FacultyDepartmentEntity } from 'src/database/entities/faculty-department.entity';
 import { RoleEntity } from 'src/database/entities/role.entity';
 import { UserEntity } from 'src/database/entities/user.entity';
 import { HashingService } from 'src/shared/services/hashing.service';
-import { In, Like, QueryFailedError, Repository } from 'typeorm';
+import { ILike, In, QueryFailedError, Repository } from 'typeorm';
 import { QueryAccountDto, UpdateAccountDto } from './account.dto';
-import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class AccountService {
@@ -61,7 +61,7 @@ export class AccountService {
         },
         where: {
           facultyDepartmentId: facultyDepartmentId || undefined,
-          fullName: search ? Like(`%${search}%`) : undefined,
+          fullName: search ? ILike(`%${search}%`) : undefined,
         },
         skip,
         take: limit,

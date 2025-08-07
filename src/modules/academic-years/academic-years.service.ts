@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AcademicYearEntity } from 'src/database/entities/academic-years.entity';
-import { IsNull, Like, Not, QueryFailedError, Repository } from 'typeorm';
+import { ILike, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateAcademicYearDto,
   QueryAcademicYearDeletedDto,
@@ -57,7 +57,7 @@ export class AcademicYearsService {
 
       const [data, total] = await this.academicYearRepository.findAndCount({
         where: {
-          yearCode: search ? Like(`%${search}%`) : undefined,
+          yearCode: search ? ILike(`%${search}%`) : undefined,
         },
         skip,
         take: limit,
@@ -207,7 +207,7 @@ export class AcademicYearsService {
 
       const [data, total] = await this.academicYearRepository.findAndCount({
         where: {
-          yearCode: search ? Like(`%${search}%`) : undefined,
+          yearCode: search ? ILike(`%${search}%`) : undefined,
           deletedAt: Not(IsNull()),
         },
         skip,

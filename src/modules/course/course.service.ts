@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { CourseEntity } from 'src/database/entities/course.entity';
 import { FacultyDepartmentEntity } from 'src/database/entities/faculty-department.entity';
 import { SubjectEntity } from 'src/database/entities/subject.entity';
-import { IsNull, Like, Not, QueryFailedError, Repository } from 'typeorm';
+import { ILike, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateCourseDto,
   QueryCourseDeletedDto,
@@ -106,7 +106,7 @@ export class CourseService {
           facultyDepartmentId: facultyDepartmentId || undefined,
           subjectId: subjectId || undefined,
           semester: semester || undefined,
-          courseCode: search ? Like(`%${search}%`) : undefined,
+          courseCode: search ? ILike(`%${search}%`) : undefined,
         },
         relations: {
           facultyDepartment: true,
@@ -309,7 +309,7 @@ export class CourseService {
 
       // Thêm điều kiện tìm kiếm nếu có
       if (search) {
-        whereCondition.courseCode = Like(`%${search}%`);
+        whereCondition.courseCode = ILike(`%${search}%`);
       }
 
       // Loại bỏ các điều kiện undefined

@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EducationalSystemEntity } from 'src/database/entities/educational-system.entity';
-import { IsNull, Like, Not, QueryFailedError, Repository } from 'typeorm';
+import { ILike, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateEducationalSystemDto,
   QueryEducationalSystemDeletedDto,
@@ -69,7 +69,7 @@ export class EducationalSystemService {
       };
 
       if (search) {
-        whereCondition.code = Like(`%${search}%`);
+        whereCondition.code = ILike(`%${search}%`);
       }
 
       Object.keys(whereCondition).forEach((key) => {
@@ -244,7 +244,7 @@ export class EducationalSystemService {
       };
 
       if (search) {
-        whereCondition.code = Like(`%${search}%`);
+        whereCondition.code = ILike(`%${search}%`);
       }
 
       Object.keys(whereCondition).forEach((key) => {
@@ -290,7 +290,7 @@ export class EducationalSystemService {
       const whereCondition: any = {};
 
       if (search) {
-        whereCondition.code = Like(`%${search}%`);
+        whereCondition.code = ILike(`%${search}%`);
       }
 
       Object.keys(whereCondition).forEach((key) => {

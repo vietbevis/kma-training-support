@@ -11,7 +11,7 @@ import { FacultyDepartmentEntity } from 'src/database/entities/faculty-departmen
 import { PermissionEntity } from 'src/database/entities/permission.entity';
 import { RoleEntity } from 'src/database/entities/role.entity';
 import { SystemRole } from 'src/shared/enums/system-role';
-import { In, Like, Repository } from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { CreateRoleDto, GetRolesQueryDto, UpdateRoleDto } from './role.dto';
 
 @Injectable()
@@ -72,8 +72,8 @@ export class RoleService {
 
     const [data, total] = await this.roleRepository.findAndCount({
       where: {
-        name: search ? Like(`%${search}%`) : undefined,
-        description: search ? Like(`%${search}%`) : undefined,
+        name: search ? ILike(`%${search}%`) : undefined,
+        description: search ? ILike(`%${search}%`) : undefined,
         isSystemRole: isSystemRole !== undefined ? isSystemRole : undefined,
         isActive: isActive !== undefined ? isActive : undefined,
       },

@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { PermissionEntity } from 'src/database/entities/permission.entity';
 import { HttpMethod } from 'src/shared/enums/http-method.enum';
 import { IRouteInfo } from 'src/shared/types';
-import { Like, Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import { GetPermissionsQueryDto, UpdatePermissionDto } from './permission.dto';
 
 @Injectable()
@@ -21,8 +21,8 @@ export class PermissionService {
 
     const [data, total] = await this.permissionRepository.findAndCount({
       where: {
-        name: search ? Like(`%${search}%`) : undefined,
-        description: search ? Like(`%${search}%`) : undefined,
+        name: search ? ILike(`%${search}%`) : undefined,
+        description: search ? ILike(`%${search}%`) : undefined,
       },
       skip,
       take: limit,

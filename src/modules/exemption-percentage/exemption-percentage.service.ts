@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ExemptionPercentageEntity } from 'src/database/entities/exemption-percentage.entity';
-import { IsNull, Like, Not, QueryFailedError, Repository } from 'typeorm';
+import { ILike, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateExemptionPercentageDto,
   QueryExemptionPercentageDeletedDto,
@@ -66,7 +66,7 @@ export class ExemptionPercentageService {
       };
 
       if (search) {
-        whereCondition.reason = Like(`%${search}%`);
+        whereCondition.reason = ILike(`%${search}%`);
       }
 
       Object.keys(whereCondition).forEach((key) => {
@@ -234,7 +234,7 @@ export class ExemptionPercentageService {
       };
 
       if (search) {
-        whereCondition.reason = Like(`%${search}%`);
+        whereCondition.reason = ILike(`%${search}%`);
       }
 
       Object.keys(whereCondition).forEach((key) => {

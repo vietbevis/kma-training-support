@@ -10,7 +10,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { AcademicCredentialsEntity } from 'src/database/entities/academic-credentials.entity';
 import { UserEntity } from 'src/database/entities/user.entity';
-import { IsNull, Like, Not, QueryFailedError, Repository } from 'typeorm';
+import { ILike, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateAcademicCredentialDto,
   QueryAcademicCredentialDeletedDto,
@@ -62,7 +62,7 @@ export class AcademicCredentialService {
       const [data, total] =
         await this.academicCredentialRepository.findAndCount({
           where: {
-            name: search ? Like(`%${search}%`) : undefined,
+            name: search ? ILike(`%${search}%`) : undefined,
           },
           skip,
           take: limit,
@@ -251,7 +251,7 @@ export class AcademicCredentialService {
       const [data, total] =
         await this.academicCredentialRepository.findAndCount({
           where: {
-            name: search ? Like(`%${search}%`) : undefined,
+            name: search ? ILike(`%${search}%`) : undefined,
             deletedAt: Not(IsNull()),
           },
           skip,

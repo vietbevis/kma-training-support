@@ -14,7 +14,7 @@ import { RoleEntity } from 'src/database/entities/role.entity';
 import { SubjectEntity } from 'src/database/entities/subject.entity';
 import { UserEntity } from 'src/database/entities/user.entity';
 import { HashingService } from 'src/shared/services/hashing.service';
-import { In, IsNull, Like, Not, QueryFailedError, Repository } from 'typeorm';
+import { ILike, In, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateUserDto,
   QueryUserDeletedDto,
@@ -185,7 +185,7 @@ export class UserService {
           academicCredentialId: academicCredentialId || undefined,
           gender: gender || undefined,
           areTeaching: areTeaching !== undefined ? areTeaching : undefined,
-          fullName: search ? Like(`%${search}%`) : undefined,
+          fullName: search ? ILike(`%${search}%`) : undefined,
         },
         skip,
         take: limit,
@@ -473,7 +473,7 @@ export class UserService {
           gender: gender || undefined,
           areTeaching: areTeaching !== undefined ? areTeaching : undefined,
           deletedAt: Not(IsNull()),
-          fullName: search ? Like(`%${search}%`) : undefined,
+          fullName: search ? ILike(`%${search}%`) : undefined,
         },
         skip,
         take: limit,

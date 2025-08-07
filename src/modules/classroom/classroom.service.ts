@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { BuildingEntity } from 'src/database/entities/building.entity';
 import { ClassroomEntity } from 'src/database/entities/classrooms.entity';
-import { IsNull, Like, Not, QueryFailedError, Repository } from 'typeorm';
+import { ILike, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateClassroomDto,
   QueryClassroomDeletedDto,
@@ -77,7 +77,7 @@ export class ClassroomService {
       const skip = (page - 1) * limit;
 
       const whereCondition: any = {
-        name: search ? Like(`%${search}%`) : undefined,
+        name: search ? ILike(`%${search}%`) : undefined,
         buildingId: buildingId || undefined,
       };
 
@@ -252,7 +252,7 @@ export class ClassroomService {
       const skip = (page - 1) * limit;
 
       const whereCondition: any = {
-        name: search ? Like(`%${search}%`) : undefined,
+        name: search ? ILike(`%${search}%`) : undefined,
         buildingId: buildingId || undefined,
         deletedAt: Not(IsNull()),
       };

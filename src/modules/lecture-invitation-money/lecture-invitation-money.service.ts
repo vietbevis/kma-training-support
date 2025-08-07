@@ -9,7 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { AcademicCredentialsEntity } from 'src/database/entities/academic-credentials.entity';
 import { LectureInvitationMoneyEntity } from 'src/database/entities/lecture-invitation-money.entity';
-import { IsNull, Like, Not, QueryFailedError, Repository } from 'typeorm';
+import { ILike, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateLectureInvitationMoneyDto,
   QueryLectureInvitationMoneyDeletedDto,
@@ -92,7 +92,7 @@ export class LectureInvitationMoneyService {
       };
 
       if (search) {
-        whereCondition.educationalSystem = Like(`%${search}%`);
+        whereCondition.educationalSystem = ILike(`%${search}%`);
       }
 
       Object.keys(whereCondition).forEach((key) => {
@@ -290,7 +290,7 @@ export class LectureInvitationMoneyService {
       };
 
       if (search) {
-        whereCondition.educationalSystem = Like(`%${search}%`);
+        whereCondition.educationalSystem = ILike(`%${search}%`);
       }
 
       Object.keys(whereCondition).forEach((key) => {

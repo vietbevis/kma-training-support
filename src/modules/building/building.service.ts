@@ -10,7 +10,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { BuildingEntity } from 'src/database/entities/building.entity';
 import { ClassroomEntity } from 'src/database/entities/classrooms.entity';
-import { IsNull, Like, Not, QueryFailedError, Repository } from 'typeorm';
+import { ILike, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateBuildingDto,
   QueryBuildingDeletedDto,
@@ -58,7 +58,7 @@ export class BuildingService {
 
       const [data, total] = await this.buildingRepository.findAndCount({
         where: {
-          name: search ? Like(`%${search}%`) : undefined,
+          name: search ? ILike(`%${search}%`) : undefined,
         },
         skip,
         take: limit,
@@ -241,7 +241,7 @@ export class BuildingService {
 
       const [data, total] = await this.buildingRepository.findAndCount({
         where: {
-          name: search ? Like(`%${search}%`) : undefined,
+          name: search ? ILike(`%${search}%`) : undefined,
           deletedAt: Not(IsNull()),
         },
         skip,
