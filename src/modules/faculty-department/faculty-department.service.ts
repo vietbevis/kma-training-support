@@ -67,10 +67,6 @@ export class FacultyDepartmentService {
 
       const whereConditions: any = {};
 
-      if (search) {
-        whereConditions.name = Like(`%${search}%`);
-      }
-
       if (isFaculty !== undefined) {
         whereConditions.isFaculty = isFaculty;
       }
