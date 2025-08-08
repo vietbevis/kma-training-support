@@ -285,7 +285,8 @@ export class EducationalSystemService {
 
   async getOptions(queryDto: QueryEducationalSystemOptionsDto) {
     try {
-      const { search } = queryDto;
+      const { page = 1, limit = 10, search } = queryDto;
+      const skip = (page - 1) * limit;
 
       const whereCondition: any = {};
 
@@ -299,18 +300,50 @@ export class EducationalSystemService {
         }
       });
 
-      const data = await this.educationalSystemRepository
+      // Build query for distinct combinations
+      const queryBuilder = this.educationalSystemRepository
         .createQueryBuilder('educationalSystem')
         .select([
           'DISTINCT educationalSystem.educationLevels as educationLevels',
           'educationalSystem.tuitions as tuitions',
         ])
-        .where(whereCondition)
         .orderBy('educationalSystem.educationLevels', 'ASC')
-        .addOrderBy('educationalSystem.tuitions', 'ASC')
-        .getRawMany();
+        .addOrderBy('educationalSystem.tuitions', 'ASC');
 
-      return data;
+      // Add where condition if search is provided
+      if (Object.keys(whereCondition).length > 0) {
+        queryBuilder.where(whereCondition);
+      }
+
+      // Get total count for pagination
+      const countQuery = this.educationalSystemRepository
+        .createQueryBuilder('educationalSystem')
+        .select(
+          'COUNT(DISTINCT CONCAT(educationalSystem.educationLevels, educationalSystem.tuitions))',
+          'count',
+        );
+
+      if (Object.keys(whereCondition).length > 0) {
+        countQuery.where(whereCondition);
+      }
+
+      const totalResult = await countQuery.getRawOne();
+      const total = parseInt(totalResult.count);
+
+      // Add pagination
+      queryBuilder.skip(skip).take(limit);
+
+      const data = await queryBuilder.getRawMany();
+
+      return {
+        data,
+        meta: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
     } catch (error) {
       this.logger.error('Lỗi lấy danh sách options hệ đào tạo', error);
       throw new BadRequestException({

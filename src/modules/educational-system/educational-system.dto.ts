@@ -193,6 +193,32 @@ export class EducationalSystemParamDto {
 
 export class QueryEducationalSystemOptionsDto {
   @ApiProperty({
+    description: 'Số trang',
+    example: 1,
+    required: false,
+    minimum: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiProperty({
+    description: 'Số lượng bản ghi trên một trang',
+    example: 10,
+    required: false,
+    minimum: 1,
+    maximum: 100,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number = 10;
+
+  @ApiProperty({
     description: 'Từ khóa tìm kiếm (tìm trong mã, tên lớp và loại sinh viên)',
     required: false,
   })
