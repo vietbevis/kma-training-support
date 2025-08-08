@@ -336,7 +336,10 @@ export class EducationalSystemService {
       const data = await queryBuilder.getRawMany();
 
       return {
-        data,
+        data: data.map((item) => ({
+          educationLevels: item.educationlevels,
+          tuitions: item.tuitions,
+        })),
         meta: {
           page,
           limit,
