@@ -46,9 +46,10 @@ export class LectureInvitationMoneyService {
       }
 
       const lectureInvitationMoney =
-        this.lectureInvitationMoneyRepository.create(
-          createLectureInvitationMoneyDto,
-        );
+        this.lectureInvitationMoneyRepository.create({
+          ...createLectureInvitationMoneyDto,
+          academicCredential,
+        });
 
       const newLectureInvitationMoney =
         await this.lectureInvitationMoneyRepository.save(
@@ -81,14 +82,12 @@ export class LectureInvitationMoneyService {
         limit = 10,
         search,
         academicCredentialId,
-        educationalSystem,
         includeDeleted = false,
       } = queryDto;
       const skip = (page - 1) * limit;
 
       const whereCondition: any = {
         academicCredentialId: academicCredentialId || undefined,
-        educationalSystem: educationalSystem || undefined,
       };
 
       if (search) {
@@ -274,18 +273,11 @@ export class LectureInvitationMoneyService {
 
   async getDeletedRecords(queryDto: QueryLectureInvitationMoneyDeletedDto) {
     try {
-      const {
-        page = 1,
-        limit = 10,
-        search,
-        academicCredentialId,
-        educationalSystem,
-      } = queryDto;
+      const { page = 1, limit = 10, search, academicCredentialId } = queryDto;
       const skip = (page - 1) * limit;
 
       const whereCondition: any = {
         academicCredentialId: academicCredentialId || undefined,
-        educationalSystem: educationalSystem || undefined,
         deletedAt: Not(IsNull()),
       };
 

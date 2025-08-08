@@ -86,14 +86,6 @@ export class QueryLectureInvitationMoneyDto {
   academicCredentialId?: string;
 
   @ApiProperty({
-    description: 'Hệ đào tạo để lọc',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  educationalSystem?: string;
-
-  @ApiProperty({
     description: 'Bao gồm các bản ghi đã xóa mềm',
     required: false,
   })
@@ -150,14 +142,6 @@ export class QueryLectureInvitationMoneyDeletedDto {
   @IsOptional()
   @IsUUID()
   academicCredentialId?: string;
-
-  @ApiProperty({
-    description: 'Hệ đào tạo để lọc',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  educationalSystem?: string;
 }
 
 export class LectureInvitationMoneyParamDto {
