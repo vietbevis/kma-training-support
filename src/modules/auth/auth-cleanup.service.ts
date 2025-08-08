@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { RefreshTokenEntity } from 'src/database/entities/refresh-token.entity';
-import { Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
 
 @Injectable()
 export class AuthCleanupService {
@@ -17,7 +17,7 @@ export class AuthCleanupService {
   async cleanupExpiredTokens() {
     try {
       const result = await this.refreshTokenRepository.delete({
-        expiresAt: new Date(),
+        expiresAt: LessThan(new Date()),
       });
 
       this.logger.log(`Đã xóa ${result.affected} refresh token hết hạn`);
