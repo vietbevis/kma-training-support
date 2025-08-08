@@ -1,6 +1,6 @@
 import { ApiHideProperty } from '@nestjs/swagger';
 import { Exclude, Type } from 'class-transformer';
-import { KiHoc } from 'src/shared/enums/semester.enum';
+import { KyHoc } from 'src/shared/enums/semester.enum';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { AuditableEntity } from '../base/auditable.entity';
 import { FacultyDepartmentEntity } from './faculty-department.entity';
@@ -28,11 +28,11 @@ export class CourseEntity extends AuditableEntity {
   @Column({
     name: 'semester',
     type: 'enum',
-    enum: KiHoc,
+    enum: KyHoc,
     comment: 'Kỳ học trong chương trình',
     nullable: true,
   })
-  semester!: KiHoc;
+  semester!: KyHoc;
 
   @Column({
     name: 'description',

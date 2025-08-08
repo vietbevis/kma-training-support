@@ -12,7 +12,7 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { KiHoc } from 'src/shared/enums/semester.enum';
+import { KyHoc } from 'src/shared/enums/semester.enum';
 
 export class CreateCourseDto {
   @ApiProperty({
@@ -45,12 +45,12 @@ export class CreateCourseDto {
 
   @ApiProperty({
     description: 'Kỳ học',
-    enum: KiHoc,
+    enum: KyHoc,
     required: false,
   })
   @IsOptional()
-  @IsEnum(KiHoc)
-  semester?: KiHoc;
+  @IsEnum(KyHoc)
+  semester?: KyHoc;
 
   @ApiProperty({
     description: 'Mô tả học phần',
@@ -135,12 +135,12 @@ export class QueryCourseDto {
 
   @ApiProperty({
     description: 'Kỳ học để lọc',
-    enum: KiHoc,
+    enum: KyHoc,
     required: false,
   })
   @IsOptional()
-  @IsEnum(KiHoc)
-  semester?: KiHoc;
+  @IsEnum(KyHoc)
+  semester?: KyHoc;
 
   @ApiProperty({
     description: 'Bao gồm các bản ghi đã xóa mềm',
@@ -210,12 +210,12 @@ export class QueryCourseDeletedDto {
 
   @ApiProperty({
     description: 'Kỳ học để lọc',
-    enum: KiHoc,
+    enum: KyHoc,
     required: false,
   })
   @IsOptional()
-  @IsEnum(KiHoc)
-  semester?: KiHoc;
+  @IsEnum(KyHoc)
+  semester?: KyHoc;
 }
 
 export class CourseParamDto {
