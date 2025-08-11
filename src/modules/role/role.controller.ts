@@ -9,6 +9,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { UserEntity } from 'src/database/entities/user.entity';
+import { CurrentUser } from 'src/shared/decorators/current-user.decorator';
 import {
   CreateRoleDto,
   GetRolesQueryDto,
@@ -45,8 +47,13 @@ export class RoleController {
   async update(
     @Param() params: RoleParamDto,
     @Body() updateRoleDto: UpdateRoleDto,
+    @CurrentUser() user: UserEntity,
   ) {
-    return await this.roleService.update(params.id, updateRoleDto, false);
+    return await this.roleService.update(
+      params.id,
+      updateRoleDto,
+      user.roles.some((role) => role.name === 'admin'),
+    );
   }
 
   @Delete(':id')

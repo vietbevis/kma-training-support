@@ -202,36 +202,4 @@ export class FilesService {
       totalSize,
     };
   }
-
-  async getFileInfo(
-    fileName: string,
-  ): Promise<{ mimeType: string; originalName: string }> {
-    try {
-      const stat = await this.minioClient.statObject(this.bucketName, fileName);
-
-      // Lấy original name từ metadata hoặc từ fileName
-      const originalName = stat.metaData?.['original-name'] || fileName;
-
-      return {
-        mimeType: stat.metaData?.['content-type'] || 'application/octet-stream',
-        originalName,
-      };
-    } catch (error) {
-      this.logger.error('❌ Lỗi khi lấy thông tin file từ MinIO:', error);
-      throw new Error('Không thể lấy thông tin file từ MinIO');
-    }
-  }
-
-  async getFile(fileName: string): Promise<NodeJS.ReadableStream> {
-    try {
-      const fileStream = await this.minioClient.getObject(
-        this.bucketName,
-        fileName,
-      );
-      return fileStream;
-    } catch (error) {
-      this.logger.error('❌ Lỗi khi lấy file từ MinIO:', error);
-      throw new Error('Không thể lấy file từ MinIO');
-    }
-  }
 }

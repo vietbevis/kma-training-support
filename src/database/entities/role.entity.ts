@@ -1,3 +1,5 @@
+import { ApiHideProperty } from '@nestjs/swagger';
+import { Exclude } from 'class-transformer';
 import { AuditableEntity } from 'src/database/base/auditable.entity';
 import {
   Column,
@@ -24,6 +26,8 @@ export class RoleEntity extends AuditableEntity {
   @Column({ type: 'boolean', name: 'is_system_role', default: false })
   isSystemRole: boolean;
 
+  @ApiHideProperty()
+  @Exclude()
   @Column({ name: 'scope_faculty_department_id', nullable: true })
   scopeFacultyDepartmentId: string;
 
