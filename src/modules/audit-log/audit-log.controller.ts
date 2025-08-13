@@ -8,7 +8,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Public } from 'src/shared/decorators/public.decorator';
 import {
   CreateManualAuditLogDto,
   GetAuditLogsQueryDto,
@@ -20,13 +19,11 @@ import {
 import { AuditLogService } from './audit-log.service';
 
 @ApiTags('Audit Log - Nhật ký audit')
-@Public()
 @Controller('audit-logs')
 export class AuditLogController {
   constructor(private readonly auditLogService: AuditLogService) {}
 
   @Get()
-  @Public()
   @ApiOperation({ summary: 'Lấy danh sách audit logs' })
   @ApiResponse({
     status: 200,
