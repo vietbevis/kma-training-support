@@ -1,12 +1,11 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
+import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import { Client } from 'minio';
 import { ClsModule } from 'nestjs-cls';
 import envConfig from 'src/configs/env.config';
 import { MINIO_TOKEN } from './decorators/minio.decorator';
 import { ApiExceptionFilter } from './filters/api-exception.filter';
-import { AuthGuard } from './guards/auth.guard';
 import { ApiValidationPipe } from './pipes/validation.pipe';
 import { ConfigService } from './services/config.service';
 import { HashingService } from './services/hashing.service';
@@ -35,10 +34,6 @@ const services = [ConfigService, HashingService, RsaKeyManager];
     {
       provide: APP_PIPE,
       useClass: ApiValidationPipe,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: AuthGuard,
     },
     {
       inject: [ConfigService],

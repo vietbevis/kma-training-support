@@ -205,8 +205,9 @@ export class UserEntity extends AuditableEntity {
   @Column({
     name: 'exemption_percentage_id',
     comment: 'Phần trăm miễn giảm',
+    nullable: true,
   })
-  exemptionPercentageId: string;
+  exemptionPercentageId: string | null;
 
   @ManyToOne(() => ExemptionPercentageEntity)
   @JoinColumn({ name: 'exemption_percentage_id' })
@@ -220,7 +221,7 @@ export class UserEntity extends AuditableEntity {
     nullable: true,
     comment: 'Bộ môn (null nếu nhân viên thuộc khoa)',
   })
-  subjectId: string;
+  subjectId: string | null;
 
   @ManyToOne(() => SubjectEntity)
   @JoinColumn({ name: 'subject_id' })
