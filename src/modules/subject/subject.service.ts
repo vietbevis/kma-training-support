@@ -10,7 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FacultyDepartmentEntity } from 'src/database/entities/faculty-department.entity';
 import { SubjectEntity } from 'src/database/entities/subject.entity';
 import { UserEntity } from 'src/database/entities/user.entity';
-import { IsNull, Like, Not, QueryFailedError, Repository } from 'typeorm';
+import { ILike, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateSubjectDto,
   QuerySubjectDeletedDto,
@@ -84,8 +84,8 @@ export class SubjectService {
 
       const [data, total] = await this.subjectRepository.findAndCount({
         where: [
-          { ...whereConditions, name: Like(`%${search || ''}%`) },
-          { ...whereConditions, code: Like(`%${search || ''}%`) },
+          { ...whereConditions, name: ILike(`%${search || ''}%`) },
+          { ...whereConditions, code: ILike(`%${search || ''}%`) },
         ].filter((condition) => {
           if (!search) {
             const { name, code, ...rest } = condition;
@@ -269,8 +269,8 @@ export class SubjectService {
 
       const [data, total] = await this.subjectRepository.findAndCount({
         where: [
-          { ...whereConditions, name: Like(`%${search || ''}%`) },
-          { ...whereConditions, code: Like(`%${search || ''}%`) },
+          { ...whereConditions, name: ILike(`%${search || ''}%`) },
+          { ...whereConditions, code: ILike(`%${search || ''}%`) },
         ].filter((condition) => {
           if (!search) {
             const { name, code, ...rest } = condition;
