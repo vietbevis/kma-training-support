@@ -453,7 +453,7 @@ export class AuditLogSubscriber
         newValues: params.newValues
           ? this.sanitizeValues(params.newValues)
           : undefined,
-        changedFields,
+        changedFields: Array.from(new Set(changedFields)),
         context: this.getAuditContext(),
       };
 
@@ -517,7 +517,7 @@ export class AuditLogSubscriber
       endpoint: context.endpoint,
       oldValues: config.trackOldValues ? params.oldValues : undefined,
       newValues: config.trackNewValues ? params.newValues : undefined,
-      changedFields: params.changedFields,
+      changedFields: Array.from(new Set(params.changedFields)),
       metadata: {
         ...context.metadata,
         error: params.error,
@@ -527,7 +527,7 @@ export class AuditLogSubscriber
       description: await this.generateDescription(
         params.action,
         params.entityName,
-        params.changedFields,
+        Array.from(new Set(params.changedFields)),
         params.oldValues,
         params.newValues,
         context.user,
@@ -579,7 +579,7 @@ export class AuditLogSubscriber
       description = await this.generateUpdateDescription(
         vietnameseEntityName,
         userInfo,
-        changedFields,
+        Array.from(new Set(changedFields)),
         oldValues,
         newValues,
       );
@@ -764,19 +764,9 @@ export class AuditLogSubscriber
     // Xử lý null hoặc undefined
     if (_.isNil(value)) return '';
 
-    // Xử lý Date
+    // Xử lý Date object
     if (_.isDate(value)) {
       return value.toLocaleDateString('vi-VN', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
-    }
-
-    // Xử lý chuỗi dạng ISO date
-    if (_.isString(value) && !isNaN(Date.parse(value))) {
-      const date = new Date(value);
-      return date.toLocaleDateString('vi-VN', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
@@ -797,7 +787,35 @@ export class AuditLogSubscriber
       return `<ul>${entries.join('')}</ul>`;
     }
 
-    // Xử lý number, boolean, string
+    // Xử lý số
+    if (_.isNumber(value)) {
+      return value.toString();
+    }
+
+    // Xử lý boolean
+    if (_.isBoolean(value)) {
+      return value.toString();
+    }
+
+    // Xử lý chuỗi - kiểm tra ISO date với regex chặt chẽ hơn
+    if (_.isString(value)) {
+      // Regex để kiểm tra định dạng ISO 8601 chính xác
+      const isoDateRegex =
+        /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/;
+
+      if (isoDateRegex.test(value) && !isNaN(Date.parse(value))) {
+        const date = new Date(value);
+        return date.toLocaleDateString('vi-VN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        });
+      }
+
+      return value;
+    }
+
+    // Fallback cho các trường hợp khác
     return _.toString(value);
   }
 
