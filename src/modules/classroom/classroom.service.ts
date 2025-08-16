@@ -149,10 +149,22 @@ export class ClassroomService {
 
   async update(id: string, updateClassroomDto: UpdateClassroomDto) {
     try {
-      const classroom = await this.findOne(id);
+      const classroom = await this.classroomRepository.findOne({
+        where: { id },
+        select: { id: true, name: true, buildingId: true },
+      });
 
-      // Kiểm tra tòa nhà nếu có cập nhật buildingId
-      if (updateClassroomDto.buildingId) {
+      if (!classroom) {
+        throw new NotFoundException({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'Không tìm thấy phòng học',
+        });
+      }
+
+      if (
+        updateClassroomDto.buildingId &&
+        updateClassroomDto.buildingId !== classroom.buildingId
+      ) {
         const building = await this.buildingRepository.findOne({
           where: { id: updateClassroomDto.buildingId },
         });
