@@ -38,6 +38,7 @@
     "class-validator": "^0.14.2",
     "compression": "^1.8.1",
     "helmet": "^8.1.0",
+    "install": "^0.13.0",
     "jsonwebtoken": "^9.0.2",
     "minio": "^8.0.5",
     "morgan": "^1.10.1",
