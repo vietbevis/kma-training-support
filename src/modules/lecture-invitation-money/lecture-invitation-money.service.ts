@@ -166,10 +166,25 @@ export class LectureInvitationMoneyService {
     updateLectureInvitationMoneyDto: UpdateLectureInvitationMoneyDto,
   ) {
     try {
-      const lectureInvitationMoney = await this.findOne(id);
+      const lectureInvitationMoney =
+        await this.lectureInvitationMoneyRepository.findOne({
+          where: { id },
+          select: { id: true, academicCredentialId: true },
+        });
+
+      if (!lectureInvitationMoney) {
+        throw new NotFoundException({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'Không tìm thấy tiền mời giảng',
+        });
+      }
 
       // Kiểm tra academicCredentialId có tồn tại không nếu có cập nhật
-      if (updateLectureInvitationMoneyDto.academicCredentialId) {
+      if (
+        updateLectureInvitationMoneyDto.academicCredentialId &&
+        updateLectureInvitationMoneyDto.academicCredentialId !==
+          lectureInvitationMoney.academicCredentialId
+      ) {
         const academicCredential =
           await this.academicCredentialRepository.findOne({
             where: { id: updateLectureInvitationMoneyDto.academicCredentialId },

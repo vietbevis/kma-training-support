@@ -69,3 +69,13 @@ export class PermissionParamDto {
   @IsUUID()
   id: string;
 }
+
+export class GetPermissionsByModuleDto {
+  @ApiProperty({
+    description: 'Tên module',
+    example: 'user',
+  })
+  @IsNotEmpty()
+  @IsString()
+  module: string;
+}

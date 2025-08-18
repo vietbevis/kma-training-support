@@ -39,6 +39,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-function-type': 'off',
       '@typescript-eslint/no-base-to-string': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+      '@typescript-eslint/no-misused-promises': 'off',
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },

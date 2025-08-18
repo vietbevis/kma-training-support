@@ -173,10 +173,27 @@ export class CourseService {
 
   async update(id: string, updateCourseDto: UpdateCourseDto) {
     try {
-      const course = await this.findOne(id);
+      const course = await this.courseRepository.findOne({
+        where: { id },
+        select: {
+          id: true,
+          facultyDepartmentId: true,
+          subjectId: true,
+        },
+      });
+
+      if (!course) {
+        throw new NotFoundException({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'Không tìm thấy học phần',
+        });
+      }
 
       // Kiểm tra khoa tồn tại nếu có cập nhật
-      if (updateCourseDto.facultyDepartmentId) {
+      if (
+        updateCourseDto.facultyDepartmentId &&
+        updateCourseDto.facultyDepartmentId !== course?.facultyDepartmentId
+      ) {
         const facultyDepartment =
           await this.facultyDepartmentRepository.findOne({
             where: {
@@ -194,7 +211,10 @@ export class CourseService {
       }
 
       // Kiểm tra bộ môn tồn tại nếu có cập nhật
-      if (updateCourseDto.subjectId) {
+      if (
+        updateCourseDto.subjectId &&
+        updateCourseDto.subjectId !== course?.subjectId
+      ) {
         const subject = await this.subjectRepository.findOne({
           where: { id: updateCourseDto.subjectId },
         });
@@ -208,6 +228,14 @@ export class CourseService {
       }
 
       Object.assign(course, updateCourseDto);
+
+      if (!updateCourseDto.subjectId) {
+        course.subjectId = null;
+      }
+
+      if (!updateCourseDto.facultyDepartmentId) {
+        course.facultyDepartmentId = null;
+      }
 
       const updatedCourse = await this.courseRepository.save(course);
 

@@ -10,6 +10,7 @@ import { DatabaseModule } from './database/database.module';
 import { AcademicCredentialModule } from './modules/academic-credential/academic-credential.module';
 import { AcademicYearsModule } from './modules/academic-years/academic-years.module';
 import { AccountModule } from './modules/account/account.module';
+import { AuditContextInterceptor } from './modules/audit-log/audit-context.interceptor';
 import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BuildingModule } from './modules/building/building.module';
@@ -18,6 +19,7 @@ import { CourseModule } from './modules/course/course.module';
 import { EducationalSystemModule } from './modules/educational-system/educational-system.module';
 import { ExemptionPercentageModule } from './modules/exemption-percentage/exemption-percentage.module';
 import { FacultyDepartmentModule } from './modules/faculty-department/faculty-department.module';
+import { FilesModule } from './modules/files/files.module';
 import { LectureInvitationMoneyModule } from './modules/lecture-invitation-money/lecture-invitation-money.module';
 import { PermissionModule } from './modules/permission/permission.module';
 import { RoleModule } from './modules/role/role.module';
@@ -29,14 +31,21 @@ import { CompressionMiddleware } from './shared/middlewares/compression.middlewa
 import { HelmetMiddleware } from './shared/middlewares/helmet.middleware';
 import { MorganMiddleware } from './shared/middlewares/morgan.middleware';
 import { SharedModule } from './shared/shared.module';
-import { FilesModule } from './modules/files/files.module';
 
 @Module({
   imports: [
     DatabaseModule,
     SharedModule,
     AcademicCredentialModule,
-    AuditLogModule,
+    AuditLogModule.forRoot({
+      batchSize: 50,
+      async: true,
+      maxDescriptionLength: 2500,
+      trackOldValues: true,
+      trackNewValues: true,
+      maxFieldsToShow: 10,
+      flushInterval: 5000,
+    }),
     FacultyDepartmentModule,
     SubjectModule,
     PermissionModule,
@@ -63,6 +72,10 @@ import { FilesModule } from './modules/files/files.module';
     {
       provide: APP_GUARD,
       useClass: JwtGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditContextInterceptor,
     },
   ],
 })

@@ -1,5 +1,6 @@
 import { ApiHideProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
+import { FileUploadResponseDto } from 'src/modules/files/files.dto';
 import { Gender } from 'src/shared/enums/gender.enum';
 import {
   Column,
@@ -102,18 +103,20 @@ export class UserEntity extends AuditableEntity {
   citizenIdIssuePlace?: string;
 
   @Column({
-    name: 'citizen_id_font',
+    name: 'citizen_id_front',
+    type: 'jsonb',
     nullable: true,
     comment: 'Tệp hình ảnh CCCD trước',
   })
-  citizenIdFont?: string;
+  citizenIdFront?: FileUploadResponseDto;
 
   @Column({
     name: 'citizen_id_back',
+    type: 'jsonb',
     nullable: true,
     comment: 'Tệp hình ảnh CCCD sau',
   })
-  citizenIdBack?: string;
+  citizenIdBack?: FileUploadResponseDto;
 
   @Column({
     name: 'citizen_id_address',
@@ -193,16 +196,18 @@ export class UserEntity extends AuditableEntity {
 
   @Column({
     name: 'profile_file',
+    type: 'jsonb',
     nullable: true,
     comment: 'Tệp lí lịch cá nhân',
   })
-  profileFile: string;
+  profileFile: FileUploadResponseDto;
 
   @Column({
     name: 'exemption_percentage_id',
     comment: 'Phần trăm miễn giảm',
+    nullable: true,
   })
-  exemptionPercentageId: string;
+  exemptionPercentageId: string | null;
 
   @ManyToOne(() => ExemptionPercentageEntity)
   @JoinColumn({ name: 'exemption_percentage_id' })
@@ -216,7 +221,7 @@ export class UserEntity extends AuditableEntity {
     nullable: true,
     comment: 'Bộ môn (null nếu nhân viên thuộc khoa)',
   })
-  subjectId: string;
+  subjectId: string | null;
 
   @ManyToOne(() => SubjectEntity)
   @JoinColumn({ name: 'subject_id' })

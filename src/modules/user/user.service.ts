@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  HttpStatus,
   Injectable,
   Logger,
   NotFoundException,
@@ -50,10 +49,7 @@ export class UserService {
       });
 
       if (!facultyDepartment) {
-        throw new NotFoundException({
-          statusCode: HttpStatus.NOT_FOUND,
-          message: 'Không tìm thấy phòng ban/khoa',
-        });
+        throw new NotFoundException('Không tìm thấy phòng ban/khoa');
       }
 
       // Kiểm tra academicCredentialId có tồn tại không
@@ -63,10 +59,7 @@ export class UserService {
         });
 
       if (!academicCredential) {
-        throw new NotFoundException({
-          statusCode: HttpStatus.NOT_FOUND,
-          message: 'Không tìm thấy học hàm/học vị',
-        });
+        throw new NotFoundException('Không tìm thấy học hàm/học vị');
       }
 
       // Kiểm tra exemptionPercentageId có tồn tại không (nếu có)
@@ -77,20 +70,16 @@ export class UserService {
           });
 
         if (!exemptionPercentage) {
-          throw new NotFoundException({
-            statusCode: HttpStatus.NOT_FOUND,
-            message: 'Không tìm thấy phần trăm miễn giảm',
-          });
+          throw new NotFoundException('Không tìm thấy phần trăm miễn giảm');
         }
       }
 
       // Logic đặc biệt: Nếu thuộc khoa (isFaculty = true) thì bắt buộc phải có subjectId
       if (facultyDepartment.isFaculty) {
         if (!createUserDto.subjectId) {
-          throw new BadRequestException({
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: 'Nhân viên thuộc khoa phải chọn bộ môn',
-          });
+          throw new BadRequestException(
+            'Nhân viên thuộc khoa phải chọn bộ môn',
+          );
         }
 
         // Kiểm tra subjectId có tồn tại và thuộc về khoa được chọn không
@@ -102,18 +91,16 @@ export class UserService {
         });
 
         if (!subject) {
-          throw new BadRequestException({
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: 'Bộ môn không tồn tại hoặc không thuộc khoa được chọn',
-          });
+          throw new BadRequestException(
+            'Bộ môn không tồn tại hoặc không thuộc khoa được chọn',
+          );
         }
       } else {
         // Nếu thuộc phòng ban (không phải khoa) thì không được có subjectId
         if (createUserDto.subjectId) {
-          throw new BadRequestException({
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: 'Nhân viên thuộc phòng ban không được chọn bộ môn',
-          });
+          throw new BadRequestException(
+            'Nhân viên thuộc phòng ban không được chọn bộ môn',
+          );
         }
       }
 
@@ -131,10 +118,7 @@ export class UserService {
           },
         });
         if (roles.length !== roleIdsSet.size) {
-          throw new NotFoundException({
-            statusCode: HttpStatus.NOT_FOUND,
-            message: 'Một số vai trò không tồn tại',
-          });
+          throw new NotFoundException('Một số vai trò không tồn tại');
         }
         user.roles = roles;
       }
@@ -151,15 +135,11 @@ export class UserService {
       }
       this.logger.error('Lỗi tạo nhân viên', error);
       if (error instanceof QueryFailedError) {
-        throw new ConflictException({
-          statusCode: HttpStatus.CONFLICT,
-          message: 'Nhân viên đã tồn tại (username hoặc code đã được sử dụng)',
-        });
+        throw new ConflictException(
+          'Nhân viên đã tồn tại (username hoặc code đã được sử dụng)',
+        );
       }
-      throw new BadRequestException({
-        statusCode: HttpStatus.BAD_REQUEST,
-        message: 'Không thể tạo nhân viên',
-      });
+      throw new BadRequestException('Không thể tạo nhân viên');
     }
   }
 
@@ -213,10 +193,7 @@ export class UserService {
       };
     } catch (error) {
       this.logger.error('Lỗi lấy danh sách nhân viên', error);
-      throw new BadRequestException({
-        statusCode: HttpStatus.BAD_REQUEST,
-        message: 'Không thể lấy danh sách nhân viên',
-      });
+      throw new BadRequestException('Không thể lấy danh sách nhân viên');
     }
   }
 
@@ -237,10 +214,7 @@ export class UserService {
       });
 
       if (!user) {
-        throw new NotFoundException({
-          statusCode: HttpStatus.NOT_FOUND,
-          message: 'Không tìm thấy nhân viên',
-        });
+        throw new NotFoundException('Không tìm thấy nhân viên');
       }
 
       return user;
@@ -249,147 +223,150 @@ export class UserService {
         throw error;
       }
       this.logger.error('Lỗi lấy thông tin nhân viên', error);
-      throw new BadRequestException({
-        statusCode: HttpStatus.BAD_REQUEST,
-        message: 'Không thể lấy thông tin nhân viên',
-      });
+      throw new BadRequestException('Không thể lấy thông tin nhân viên');
     }
   }
 
   async update(id: string, updateUserDto: UpdateUserDto) {
     try {
-      const user = await this.findOne(id);
+      const user = await this.userRepository.findOne({
+        where: { id },
+      });
 
-      // Kiểm tra facultyDepartmentId có tồn tại không (nếu có cập nhật)
-      if (updateUserDto.facultyDepartmentId) {
+      if (!user) {
+        throw new NotFoundException('Không tìm thấy nhân viên');
+      }
+
+      const {
+        facultyDepartmentId,
+        subjectId,
+        academicCredentialId,
+        exemptionPercentageId,
+        roleIds,
+        password,
+        ...rest
+      } = updateUserDto;
+
+      /** =========================
+       *  Kiểm tra facultyDepartmentId
+       * ========================= */
+      if (facultyDepartmentId) {
         const facultyDepartment =
           await this.facultyDepartmentRepository.findOne({
-            where: { id: updateUserDto.facultyDepartmentId },
+            where: { id: facultyDepartmentId },
+            select: { id: true, isFaculty: true },
           });
+        if (!facultyDepartment)
+          throw new NotFoundException('Không tìm thấy phòng ban/khoa');
 
-        if (!facultyDepartment) {
-          throw new NotFoundException({
-            statusCode: HttpStatus.NOT_FOUND,
-            message: 'Không tìm thấy phòng ban/khoa',
-          });
-        }
+        user.facultyDepartmentId = facultyDepartment.id;
 
-        // Logic đặc biệt: Nếu thuộc khoa (isFaculty = true) thì bắt buộc phải có subjectId
         if (facultyDepartment.isFaculty) {
-          if (!updateUserDto.subjectId) {
-            throw new BadRequestException({
-              statusCode: HttpStatus.BAD_REQUEST,
-              message: 'Nhân viên thuộc khoa phải chọn bộ môn',
-            });
-          }
+          if (!subjectId)
+            throw new BadRequestException(
+              'Nhân viên thuộc khoa phải chọn bộ môn',
+            );
 
-          // Kiểm tra subjectId có tồn tại và thuộc về khoa được chọn không
           const subject = await this.subjectRepository.findOne({
-            where: {
-              id: updateUserDto.subjectId,
-              facultyDepartmentId: updateUserDto.facultyDepartmentId,
-            },
+            where: { id: subjectId, facultyDepartmentId },
+            select: { id: true },
           });
+          if (!subject)
+            throw new BadRequestException(
+              'Bộ môn không tồn tại hoặc không thuộc khoa được chọn',
+            );
 
-          if (!subject) {
-            throw new BadRequestException({
-              statusCode: HttpStatus.BAD_REQUEST,
-              message: 'Bộ môn không tồn tại hoặc không thuộc khoa được chọn',
-            });
-          }
+          user.subjectId = subject.id;
         } else {
-          // Nếu thuộc phòng ban (không phải khoa) thì không được có subjectId
-          if (updateUserDto.subjectId) {
-            throw new BadRequestException({
-              statusCode: HttpStatus.BAD_REQUEST,
-              message: 'Nhân viên thuộc phòng ban không được chọn bộ môn',
-            });
-          }
+          if (subjectId)
+            throw new BadRequestException(
+              'Nhân viên thuộc phòng ban không được chọn bộ môn',
+            );
+          user.subjectId = null;
         }
       }
 
-      // Kiểm tra academicCredentialId có tồn tại không (nếu có cập nhật)
-      if (updateUserDto.academicCredentialId) {
+      /** =========================
+       *  Kiểm tra academicCredentialId
+       * ========================= */
+      if (academicCredentialId) {
         const academicCredential =
           await this.academicCredentialRepository.findOne({
-            where: { id: updateUserDto.academicCredentialId },
+            where: { id: academicCredentialId },
+            select: { id: true },
           });
+        if (!academicCredential)
+          throw new NotFoundException('Không tìm thấy học hàm/học vị');
 
-        if (!academicCredential) {
-          throw new NotFoundException({
-            statusCode: HttpStatus.NOT_FOUND,
-            message: 'Không tìm thấy học hàm/học vị',
-          });
-        }
+        user.academicCredentialId = academicCredential.id;
       }
 
-      // Kiểm tra exemptionPercentageId có tồn tại không (nếu có cập nhật)
-      if (updateUserDto.exemptionPercentageId) {
+      /** =========================
+       *  Kiểm tra exemptionPercentageId
+       * ========================= */
+      if (exemptionPercentageId) {
         const exemptionPercentage =
           await this.exemptionPercentageRepository.findOne({
-            where: { id: updateUserDto.exemptionPercentageId },
+            where: { id: exemptionPercentageId },
+            select: { id: true },
           });
+        if (!exemptionPercentage)
+          throw new NotFoundException('Không tìm thấy phần trăm miễn giảm');
 
-        if (!exemptionPercentage) {
-          throw new NotFoundException({
-            statusCode: HttpStatus.NOT_FOUND,
-            message: 'Không tìm thấy phần trăm miễn giảm',
-          });
-        }
+        user.exemptionPercentageId = exemptionPercentage.id;
+      } else {
+        user.exemptionPercentageId = null;
       }
 
-      // Kiểm tra roleIds có tồn tại không (nếu có cập nhật)
-      const roleIdsSet = new Set(updateUserDto.roleIds);
-      if (roleIdsSet.size > 0) {
+      /** =========================
+       *  Kiểm tra roleIds
+       * ========================= */
+      if (roleIds?.length) {
+        const roleIdsSet = new Set(roleIds);
         const roles = await this.roleRepository.find({
-          where: {
-            id: In(Array.from(roleIdsSet)),
-          },
+          where: { id: In([...roleIdsSet]) },
+          select: { id: true },
         });
-        if (roles.length !== roleIdsSet.size) {
-          throw new NotFoundException({
-            statusCode: HttpStatus.NOT_FOUND,
-            message: 'Một số vai trò không tồn tại',
-          });
-        }
+        if (roles.length !== roleIdsSet.size)
+          throw new NotFoundException('Một số vai trò không tồn tại');
         user.roles = roles;
+      } else {
+        user.roles = [];
       }
 
-      Object.assign(user, updateUserDto);
+      /** =========================
+       *  Gán các field còn lại
+       * ========================= */
+      Object.assign(user, rest);
 
-      // Kiểm tra password có tồn tại không (nếu có cập nhật)
-      // Nếu có thì có thay đổi không
-      if (updateUserDto.password) {
-        const isPasswordChanged = this.hashingService.compare(
-          updateUserDto.password,
+      /** =========================
+       *  Kiểm tra password (nếu thay đổi)
+       * ========================= */
+      if (password) {
+        const isSamePassword = this.hashingService.compare(
+          password,
           user.password,
         );
-        if (!isPasswordChanged) {
-          user.password = this.hashingService.hash(updateUserDto.password);
+        if (!isSamePassword) {
+          user.password = this.hashingService.hash(password);
         }
       }
 
-      const updatedUser = await this.userRepository.save(user);
-
-      return updatedUser;
+      return await this.userRepository.save(user);
     } catch (error) {
       if (
         error instanceof NotFoundException ||
         error instanceof BadRequestException
-      ) {
+      )
         throw error;
-      }
+
       this.logger.error('Lỗi cập nhật nhân viên', error);
       if (error instanceof QueryFailedError) {
-        throw new ConflictException({
-          statusCode: HttpStatus.CONFLICT,
-          message: 'Nhân viên đã tồn tại (username hoặc code đã được sử dụng)',
-        });
+        throw new ConflictException(
+          'Nhân viên đã tồn tại (username hoặc code đã được sử dụng)',
+        );
       }
-      throw new BadRequestException({
-        statusCode: HttpStatus.BAD_REQUEST,
-        message: 'Không thể cập nhật nhân viên',
-      });
+      throw new BadRequestException('Không thể cập nhật nhân viên');
     }
   }
 
@@ -405,10 +382,7 @@ export class UserService {
         throw error;
       }
       this.logger.error('Lỗi xóa mềm nhân viên', error);
-      throw new BadRequestException({
-        statusCode: HttpStatus.BAD_REQUEST,
-        message: 'Không thể xóa mềm nhân viên',
-      });
+      throw new BadRequestException('Không thể xóa mềm nhân viên');
     }
   }
 
@@ -424,10 +398,7 @@ export class UserService {
         throw error;
       }
       this.logger.error('Lỗi xóa vĩnh viễn nhân viên', error);
-      throw new BadRequestException({
-        statusCode: HttpStatus.BAD_REQUEST,
-        message: 'Không thể xóa vĩnh viễn nhân viên',
-      });
+      throw new BadRequestException('Không thể xóa vĩnh viễn nhân viên');
     }
   }
 
@@ -444,10 +415,7 @@ export class UserService {
         throw error;
       }
       this.logger.error('Lỗi khôi phục nhân viên', error);
-      throw new BadRequestException({
-        statusCode: HttpStatus.BAD_REQUEST,
-        message: 'Không thể khôi phục nhân viên',
-      });
+      throw new BadRequestException('Không thể khôi phục nhân viên');
     }
   }
 
@@ -501,10 +469,7 @@ export class UserService {
       };
     } catch (error) {
       this.logger.error('Lỗi lấy danh sách nhân viên đã xóa', error);
-      throw new BadRequestException({
-        statusCode: HttpStatus.BAD_REQUEST,
-        message: 'Không thể lấy danh sách nhân viên đã xóa',
-      });
+      throw new BadRequestException('Không thể lấy danh sách nhân viên đã xóa');
     }
   }
 }

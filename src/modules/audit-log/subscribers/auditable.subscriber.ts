@@ -30,12 +30,20 @@ export class AuditableSubscriber
   }
 
   beforeInsert(event: InsertEvent<AuditableEntity>) {
-    event.entity.createdById = this.cls.get('auditContext.user.id') ?? null;
+    const auditContext = this.cls.get('auditContext');
+    const userId = auditContext?.user?.id;
+    if (userId) {
+      event.entity.createdById = userId;
+    }
   }
 
   beforeUpdate(event: UpdateEvent<AuditableEntity>) {
     if (event.entity) {
-      event.entity.updatedById = this.cls.get('auditContext.user.id') ?? null;
+      const auditContext = this.cls.get('auditContext');
+      const userId = auditContext?.user?.id;
+      if (userId) {
+        event.entity.updatedById = userId;
+      }
     }
   }
 }

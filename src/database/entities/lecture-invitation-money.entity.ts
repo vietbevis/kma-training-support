@@ -1,8 +1,9 @@
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { AuditableEntity } from '../base/auditable.entity';
 import { AcademicCredentialsEntity } from './academic-credentials.entity';
 
 @Entity('tbl_lecture_invitation_money')
+@Unique(['academicCredentialId', 'educationalSystem'])
 export class LectureInvitationMoneyEntity extends AuditableEntity {
   @Column({
     name: 'money',

@@ -57,18 +57,35 @@ export class RoleService {
       scopeFacultyDepartmentId: createRoleDto.scopeFacultyDepartmentId,
     });
 
-    const savedRole = await this.roleRepository.save(role);
-
     // Gán permissions nếu có
-    if (createRoleDto.permissionIds && createRoleDto.permissionIds.length > 0) {
-      await this.assignPermissions(savedRole.id, createRoleDto.permissionIds);
+    const permissionIdsSet = new Set(createRoleDto.permissionIds);
+
+    if (permissionIdsSet.size > 0) {
+      const permissions = await this.permissionRepository.findBy({
+        id: In(Array.from(permissionIdsSet)),
+      });
+
+      if (permissions.length !== permissionIdsSet.size) {
+        throw new BadRequestException('Một số quyền hạn không tồn tại');
+      }
+
+      role.permissions = permissions;
     }
+
+    const savedRole = await this.roleRepository.save(role);
 
     return await this.findOne(savedRole.id);
   }
 
   async findAll(queryDto: GetRolesQueryDto) {
-    const { page = 1, limit = 10, search, isSystemRole, isActive } = queryDto;
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      isSystemRole,
+      isActive,
+      scopeFacultyDepartmentId,
+    } = queryDto;
 
     const [data, total] = await this.roleRepository.findAndCount({
       where: {
@@ -76,6 +93,10 @@ export class RoleService {
         description: search ? ILike(`%${search}%`) : undefined,
         isSystemRole: isSystemRole !== undefined ? isSystemRole : undefined,
         isActive: isActive !== undefined ? isActive : undefined,
+        scopeFacultyDepartmentId:
+          scopeFacultyDepartmentId !== undefined
+            ? scopeFacultyDepartmentId
+            : undefined,
       },
       skip: (page - 1) * limit,
       take: limit,
@@ -143,10 +164,12 @@ export class RoleService {
       if (!facultyDepartment) {
         throw new NotFoundException('Khoa/phòng ban không tồn tại');
       }
+
+      role.scopeFacultyDepartment = facultyDepartment;
     }
 
     Object.assign(role, {
-      name: updateRoleDto.name || role.name,
+      name: role.isSystemRole ? role.name : updateRoleDto.name || role.name,
       description:
         updateRoleDto.description !== undefined
           ? updateRoleDto.description
@@ -159,13 +182,20 @@ export class RoleService {
         updateRoleDto.scopeFacultyDepartmentId || role.scopeFacultyDepartmentId,
     });
 
-    const savedRole = await this.roleRepository.save(role);
-
     const permissionIdsSet = new Set(updateRoleDto.permissionIds);
 
     if (permissionIdsSet.size > 0) {
-      await this.assignPermissions(savedRole.id, Array.from(permissionIdsSet));
+      const permissions = await this.permissionRepository.findBy({
+        id: In(Array.from(permissionIdsSet)),
+      });
+
+      if (permissions.length !== permissionIdsSet.size) {
+        throw new BadRequestException('Một số quyền hạn không tồn tại');
+      }
+
+      role.permissions = permissions;
     }
+    const savedRole = await this.roleRepository.save(role);
 
     return await this.findOne(savedRole.id);
   }
@@ -179,23 +209,6 @@ export class RoleService {
 
     await this.roleRepository.remove(role);
     return { message: 'Vai trò đã được xóa thành công' };
-  }
-
-  async assignPermissions(roleId: string, permissionIds: string[]) {
-    const role = await this.findOne(roleId);
-    const permissionIdsSet = new Set(permissionIds);
-    const permissions = await this.permissionRepository.findBy({
-      id: In(Array.from(permissionIdsSet)),
-    });
-
-    if (permissions.length !== permissionIdsSet.size) {
-      throw new BadRequestException('Một số quyền hạn không tồn tại');
-    }
-
-    role.permissions = permissions;
-    await this.roleRepository.save(role);
-
-    return await this.findOne(roleId);
   }
 
   async syncSystemRole() {

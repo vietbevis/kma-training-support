@@ -77,6 +77,28 @@ export class PermissionService {
     return await this.permissionRepository.save(permission);
   }
 
+  async getModules() {
+    const modules = await this.permissionRepository
+      .createQueryBuilder('permission')
+      .select('DISTINCT permission.module', 'module')
+      .orderBy('permission.module', 'ASC')
+      .getRawMany();
+
+    return modules.map((item) => item.module);
+  }
+
+  async getPermissionsByModule(module: string) {
+    const permissions = await this.permissionRepository.find({
+      where: { module },
+      order: {
+        path: 'ASC',
+        method: 'ASC',
+      },
+    });
+
+    return permissions;
+  }
+
   async syncPermissions(routes: IRouteInfo[]) {
     this.logger.log(`Starting sync ${routes.length} permissions...`);
 

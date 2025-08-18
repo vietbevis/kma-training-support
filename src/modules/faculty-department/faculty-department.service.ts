@@ -10,14 +10,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { FacultyDepartmentEntity } from 'src/database/entities/faculty-department.entity';
 import { SubjectEntity } from 'src/database/entities/subject.entity';
-import {
-  ILike,
-  IsNull,
-  Like,
-  Not,
-  QueryFailedError,
-  Repository,
-} from 'typeorm';
+import { ILike, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
   CreateFacultyDepartmentDto,
   QueryFacultyDepartmentDeletedDto,
@@ -297,8 +290,8 @@ export class FacultyDepartmentService {
       const [data, total] = await this.facultyDepartmentRepository.findAndCount(
         {
           where: [
-            { ...whereConditions, name: Like(`%${search || ''}%`) },
-            { ...whereConditions, code: Like(`%${search || ''}%`) },
+            { ...whereConditions, name: ILike(`%${search || ''}%`) },
+            { ...whereConditions, code: ILike(`%${search || ''}%`) },
           ].filter((condition) => {
             if (!search) {
               const { name, code, ...rest } = condition;

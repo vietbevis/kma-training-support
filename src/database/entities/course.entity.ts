@@ -49,7 +49,7 @@ export class CourseEntity extends AuditableEntity {
     nullable: true,
     comment: 'ID khoa phụ trách học phần này',
   })
-  facultyDepartmentId!: string;
+  facultyDepartmentId!: string | null;
 
   @Type(() => FacultyDepartmentEntity)
   @ManyToOne(() => FacultyDepartmentEntity)
@@ -63,7 +63,7 @@ export class CourseEntity extends AuditableEntity {
     nullable: true,
     comment: 'ID bộ môn phụ trách học phần này',
   })
-  subjectId!: string;
+  subjectId!: string | null;
 
   @Type(() => SubjectEntity)
   @ManyToOne(() => SubjectEntity)

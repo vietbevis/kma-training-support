@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   Logger,
   UnauthorizedException,
@@ -124,8 +125,8 @@ export class JwtGuard implements CanActivate {
       );
 
       if (!hasPermission) {
-        throw new UnauthorizedException(
-          'Bạn không có quyền truy cập endpoint này',
+        throw new ForbiddenException(
+          'Bạn không có quyền thực hiện hành động này',
         );
       }
 
@@ -162,6 +163,8 @@ export class JwtGuard implements CanActivate {
         throw new UnauthorizedException(
           'Token không hợp lệ, vui lòng đăng nhập lại',
         );
+      } else if (error instanceof ForbiddenException) {
+        throw error;
       } else if (error instanceof UnauthorizedException) {
         throw error;
       } else {

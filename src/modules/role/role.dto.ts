@@ -105,6 +105,14 @@ export class GetRolesQueryDto {
   @IsString()
   search?: string;
 
+  @ApiProperty({
+    description: 'ID của khoa',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsOptional()
+  @IsUUID()
+  scopeFacultyDepartmentId?: string;
+
   @IsOptional()
   @Transform(({ obj, key }) => {
     const val = obj[key];

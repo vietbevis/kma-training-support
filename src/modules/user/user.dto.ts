@@ -15,6 +15,7 @@ import {
   Min,
 } from 'class-validator';
 import { Gender } from 'src/shared/enums/gender.enum';
+import { FileUploadResponseDto } from '../files/files.dto';
 
 export class CreateUserDto {
   @ApiProperty({
@@ -127,19 +128,21 @@ export class CreateUserDto {
     description: 'Tệp hình ảnh CCCD trước',
     example: '123456789012',
     required: false,
+    type: FileUploadResponseDto,
   })
   @IsOptional()
-  @IsString()
-  citizenIdFont?: string;
+  @Type(() => FileUploadResponseDto)
+  citizenIdFront?: FileUploadResponseDto;
 
   @ApiProperty({
     description: 'Tệp hình ảnh CCCD sau',
     example: '123456789012',
     required: false,
+    type: FileUploadResponseDto,
   })
   @IsOptional()
-  @IsString()
-  citizenIdBack?: string;
+  @Type(() => FileUploadResponseDto)
+  citizenIdBack?: FileUploadResponseDto;
 
   @ApiProperty({
     description: 'Địa chỉ trên CCCD',
@@ -239,8 +242,8 @@ export class CreateUserDto {
     required: false,
   })
   @IsOptional()
-  @IsString()
-  profileFile?: string;
+  @Type(() => FileUploadResponseDto)
+  profileFile?: FileUploadResponseDto;
 
   @ApiProperty({
     description: 'ID phần trăm miễn giảm',
@@ -398,8 +401,8 @@ export class UpdateUserDto {
     required: false,
   })
   @IsOptional()
-  @IsString()
-  citizenIdFont?: string;
+  @Type(() => FileUploadResponseDto)
+  citizenIdFront?: FileUploadResponseDto;
 
   @ApiProperty({
     description: 'Tệp hình ảnh CCCD sau',
@@ -407,8 +410,8 @@ export class UpdateUserDto {
     required: false,
   })
   @IsOptional()
-  @IsString()
-  citizenIdBack?: string;
+  @Type(() => FileUploadResponseDto)
+  citizenIdBack?: FileUploadResponseDto;
 
   @ApiProperty({
     description: 'Địa chỉ trên CCCD',
@@ -508,8 +511,8 @@ export class UpdateUserDto {
     required: false,
   })
   @IsOptional()
-  @IsString()
-  profileFile?: string;
+  @Type(() => FileUploadResponseDto)
+  profileFile?: FileUploadResponseDto;
 
   @ApiProperty({
     description: 'ID phần trăm miễn giảm',

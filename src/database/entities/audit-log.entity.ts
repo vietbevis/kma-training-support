@@ -1,6 +1,7 @@
 import { HttpMethod } from 'src/shared/enums/http-method.enum';
-import { Column, Entity } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { AuditableEntity } from '../base/auditable.entity';
+import { UserEntity } from './user.entity';
 
 export enum AuditAction {
   CREATE = 'CREATE',
@@ -83,6 +84,10 @@ export class AuditLogEntity extends AuditableEntity {
     comment: 'ID của user thực hiện hành động',
   })
   userId: string;
+
+  @ManyToOne(() => UserEntity, { nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user: UserEntity;
 
   @Column({
     type: 'inet',
