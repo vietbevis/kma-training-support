@@ -19,7 +19,7 @@ export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
   @Post('upload')
-  @UseInterceptors(FilesInterceptor('files', 10)) // Tối đa 10 files
+  @UseInterceptors(FilesInterceptor('files', 10))
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {

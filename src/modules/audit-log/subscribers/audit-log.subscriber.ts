@@ -71,6 +71,7 @@ export const ENTITY_NAME_MAPPING = Object.freeze({
   UserEntity: 'Nhân viên',
   RoleEntity: 'Vai trò',
   PermissionEntity: 'Quyền hạn',
+  VisitingLecturerEntity: 'Giảng viên mời',
 
   // Học thuật
   AcademicCredentialsEntity: 'Học hàm học vị',
@@ -117,6 +118,12 @@ export const FIELD_NAME_MAPPING = Object.freeze({
   citizenIdBack: 'Ảnh CCCD sau',
   citizenIdAddress: 'Địa chỉ trên CCCD',
   currentAddress: 'Địa chỉ hiện tại',
+  highestDegree: 'Bằng cấp cao nhất',
+  qrCode: 'Mã QR code chuyển khoản ngân hàng',
+  facultyApproved: 'Duyệt khoa',
+  trainingApproved: 'Duyệt đào tạo',
+  academyApproved: 'Duyệt học viện',
+  notes: 'Ghi chú',
 
   // Thông tin ngân hàng
   bankAccount: 'Số tài khoản',
@@ -236,6 +243,7 @@ export const RELATION_COLUMN_NAME_TO_ENTITY_NAME = Object.freeze({
   exemptionPercentageId: 'ExemptionPercentageEntity',
   headOfDepartmentId: 'UserEntity',
   scopeFacultyDepartmentId: 'FacultyDepartmentEntity',
+  visitingLecturerId: 'VisitingLecturerEntity',
 } as const);
 
 // White list fields kết thúc bằng Id nhưng không phải relation
@@ -259,6 +267,7 @@ export const RELATION_DISPLAY_FIELDS = Object.freeze({
   ExemptionPercentageEntity: ['percentage'],
   RefreshTokenEntity: ['token', 'expiresAt'],
   AuditLogEntity: ['action', 'entityName', 'entityId'],
+  VisitingLecturerEntity: ['fullName'],
 } as const);
 
 // Các relation field đặc biệt trong quan hệ 1-n hoặc n-n

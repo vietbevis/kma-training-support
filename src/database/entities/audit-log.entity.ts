@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import { HttpMethod } from 'src/shared/enums/http-method.enum';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { AuditableEntity } from '../base/auditable.entity';
@@ -105,6 +106,7 @@ export class AuditLogEntity extends AuditableEntity {
   })
   userAgent: string;
 
+  @Exclude()
   @Column({
     type: 'jsonb',
     nullable: true,
@@ -113,6 +115,7 @@ export class AuditLogEntity extends AuditableEntity {
   })
   oldValues: AuditValues;
 
+  @Exclude()
   @Column({
     type: 'jsonb',
     nullable: true,
