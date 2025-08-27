@@ -6,20 +6,25 @@ import {
   ParseFilePipe,
   Post,
   UploadedFiles,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from 'src/shared/decorators/current-user.decorator';
+import { JwtGuard } from 'src/shared/guards/jwt.guard';
 import { MultipleFileUploadResponseDto } from './files.dto';
 import { FilesService } from './files.service';
 
 @ApiTags('Files')
+@ApiBearerAuth()
+@UseGuards(JwtGuard)
 @Controller('files')
 export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
   @Post('upload')
-  @UseInterceptors(FilesInterceptor('files', 10)) // Tối đa 10 files
+  @UseInterceptors(FilesInterceptor('files', 10))
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -49,11 +54,13 @@ export class FilesController {
       }),
     )
     files: Express.Multer.File[],
+    @CurrentUser()
+    currentUser: { id: string; username: string; roles: string[] },
   ): Promise<MultipleFileUploadResponseDto> {
     if (!files || files.length === 0) {
       throw new BadRequestException('Không có file nào được upload');
     }
 
-    return this.filesService.uploadMultipleFiles(files);
+    return this.filesService.uploadMultipleFiles(files, currentUser.id);
   }
 }

@@ -126,6 +126,7 @@ export class CreateUserDto {
 
   @ApiProperty({
     description: 'Tệp hình ảnh CCCD trước',
+    example: '123456789012',
     required: false,
     type: FileUploadResponseDto,
   })
@@ -135,6 +136,7 @@ export class CreateUserDto {
 
   @ApiProperty({
     description: 'Tệp hình ảnh CCCD sau',
+    example: '123456789012',
     required: false,
     type: FileUploadResponseDto,
   })
@@ -413,8 +415,8 @@ export class UpdateUserDto {
 
   @ApiProperty({
     description: 'Tệp hình ảnh CCCD trước',
+    example: '123456789012',
     required: false,
-    type: FileUploadResponseDto,
   })
   @IsOptional()
   @Type(() => FileUploadResponseDto)
@@ -422,8 +424,8 @@ export class UpdateUserDto {
 
   @ApiProperty({
     description: 'Tệp hình ảnh CCCD sau',
+    example: '123456789012',
     required: false,
-    type: FileUploadResponseDto,
   })
   @IsOptional()
   @Type(() => FileUploadResponseDto)
@@ -523,8 +525,8 @@ export class UpdateUserDto {
 
   @ApiProperty({
     description: 'Tệp lí lịch cá nhân',
+    example: '123456789012',
     required: false,
-    type: FileUploadResponseDto,
   })
   @IsOptional()
   @Type(() => FileUploadResponseDto)

@@ -17,7 +17,7 @@ import {
 import { Gender } from 'src/shared/enums/gender.enum';
 import { FileUploadResponseDto } from '../files/files.dto';
 
-export class CreateUserDto {
+export class CreateVisitingLecturerDto {
   @ApiProperty({
     description: 'Họ và tên',
     example: 'Nguyễn Văn A',
@@ -27,28 +27,12 @@ export class CreateUserDto {
   fullName: string;
 
   @ApiProperty({
-    description: 'Tên đăng nhập',
-    example: 'nguyenvana',
-  })
-  @IsString()
-  @IsNotEmpty()
-  username: string;
-
-  @ApiProperty({
-    description: 'Mã nhân viên',
-    example: 'NV001',
+    description: 'Mã giảng viên mời',
+    example: 'GVM001',
   })
   @IsString()
   @IsNotEmpty()
   code: string;
-
-  @ApiProperty({
-    description: 'Mật khẩu',
-    example: 'password123',
-  })
-  @IsString()
-  @IsNotEmpty()
-  password: string;
 
   @ApiProperty({
     description: 'Giới tính',
@@ -191,7 +175,7 @@ export class CreateUserDto {
 
   @ApiProperty({
     description: 'Chức vụ',
-    example: 'Giảng viên',
+    example: 'Giảng viên mời',
     required: false,
   })
   @IsOptional()
@@ -262,6 +246,42 @@ export class CreateUserDto {
   qrCode?: FileUploadResponseDto;
 
   @ApiProperty({
+    description: 'Đào tạo duyệt',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  trainingApproved?: boolean = false;
+
+  @ApiProperty({
+    description: 'Khoa duyệt',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  facultyApproved?: boolean = false;
+
+  @ApiProperty({
+    description: 'Học viện duyệt',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  academyApproved?: boolean = false;
+
+  @ApiProperty({
+    description: 'Ghi chú',
+    example: 'Giảng viên mời có kinh nghiệm tốt',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @ApiProperty({
     description: 'ID phần trăm miễn giảm',
     example: '123e4567-e89b-12d3-a456-426614174000',
     required: false,
@@ -275,8 +295,8 @@ export class CreateUserDto {
     example: '123e4567-e89b-12d3-a456-426614174000',
     required: false,
   })
-  @IsOptional()
   @IsUUID()
+  @IsNotEmpty()
   subjectId?: string;
 
   @ApiProperty({
@@ -294,18 +314,9 @@ export class CreateUserDto {
   @IsUUID()
   @IsNotEmpty()
   facultyDepartmentId: string;
-
-  @ApiProperty({
-    description: 'ID các vai trò',
-    example: ['123e4567-e89b-12d3-a456-426614174000'],
-    required: false,
-  })
-  @IsOptional()
-  @IsUUID('4', { each: true })
-  roleIds?: string[];
 }
 
-export class UpdateUserDto {
+export class UpdateVisitingLecturerDto {
   @ApiProperty({
     description: 'Họ và tên',
     example: 'Nguyễn Văn A',
@@ -317,24 +328,14 @@ export class UpdateUserDto {
   fullName?: string;
 
   @ApiProperty({
-    description: 'Mã nhân viên',
-    example: 'NV001',
+    description: 'Mã giảng viên mời',
+    example: 'GVM001',
     required: false,
   })
   @IsOptional()
   @IsString()
   @IsNotEmpty()
   code?: string;
-
-  @ApiProperty({
-    description: 'Mật khẩu',
-    example: 'password123',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  password?: string;
 
   @ApiProperty({
     description: 'Giới tính',
@@ -478,7 +479,7 @@ export class UpdateUserDto {
 
   @ApiProperty({
     description: 'Chức vụ',
-    example: 'Giảng viên',
+    example: 'Giảng viên mời',
     required: false,
   })
   @IsOptional()
@@ -523,8 +524,8 @@ export class UpdateUserDto {
 
   @ApiProperty({
     description: 'Tệp lí lịch cá nhân',
+    example: '123456789012',
     required: false,
-    type: FileUploadResponseDto,
   })
   @IsOptional()
   @Type(() => FileUploadResponseDto)
@@ -549,6 +550,42 @@ export class UpdateUserDto {
   qrCode?: FileUploadResponseDto;
 
   @ApiProperty({
+    description: 'Đào tạo duyệt',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  trainingApproved?: boolean;
+
+  @ApiProperty({
+    description: 'Khoa duyệt',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  facultyApproved?: boolean;
+
+  @ApiProperty({
+    description: 'Học viện duyệt',
+    example: false,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  academyApproved?: boolean;
+
+  @ApiProperty({
+    description: 'Ghi chú',
+    example: 'Giảng viên mời có kinh nghiệm tốt',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @ApiProperty({
     description: 'ID phần trăm miễn giảm',
     example: '123e4567-e89b-12d3-a456-426614174000',
     required: false,
@@ -562,7 +599,7 @@ export class UpdateUserDto {
     example: '123e4567-e89b-12d3-a456-426614174000',
     required: false,
   })
-  @IsOptional()
+  @IsNotEmpty()
   @IsUUID()
   subjectId?: string;
 
@@ -583,18 +620,9 @@ export class UpdateUserDto {
   @IsOptional()
   @IsUUID()
   facultyDepartmentId?: string;
-
-  @ApiProperty({
-    description: 'ID các vai trò',
-    example: ['123e4567-e89b-12d3-a456-426614174000'],
-    required: false,
-  })
-  @IsOptional()
-  @IsUUID('4', { each: true })
-  roleIds?: string[];
 }
 
-export class QueryUserDto {
+export class QueryVisitingLecturerDto {
   @ApiProperty({
     description: 'Số trang',
     example: 1,
@@ -622,7 +650,7 @@ export class QueryUserDto {
   limit?: number = 10;
 
   @ApiProperty({
-    description: 'Từ khóa tìm kiếm (tìm trong họ tên, mã nhân viên, username)',
+    description: 'Từ khóa tìm kiếm (tìm trong họ tên, mã giảng viên mời)',
     required: false,
   })
   @IsOptional()
@@ -675,6 +703,48 @@ export class QueryUserDto {
     return val;
   })
   areTeaching?: boolean;
+
+  @ApiProperty({
+    description: 'Đào tạo duyệt để lọc',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ obj, key }) => {
+    const val = obj[key];
+    if (val === 'true' || val === '1' || val === 'yes') return true;
+    if (val === 'false' || val === '0' || val === 'no') return false;
+    return val;
+  })
+  trainingApproved?: boolean;
+
+  @ApiProperty({
+    description: 'Khoa duyệt để lọc',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ obj, key }) => {
+    const val = obj[key];
+    if (val === 'true' || val === '1' || val === 'yes') return true;
+    if (val === 'false' || val === '0' || val === 'no') return false;
+    return val;
+  })
+  facultyApproved?: boolean;
+
+  @ApiProperty({
+    description: 'Học viện duyệt để lọc',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ obj, key }) => {
+    const val = obj[key];
+    if (val === 'true' || val === '1' || val === 'yes') return true;
+    if (val === 'false' || val === '0' || val === 'no') return false;
+    return val;
+  })
+  academyApproved?: boolean;
 
   @ApiProperty({
     description: 'Bao gồm các bản ghi đã xóa mềm',
@@ -691,7 +761,7 @@ export class QueryUserDto {
   includeDeleted?: boolean = false;
 }
 
-export class QueryUserDeletedDto {
+export class QueryVisitingLecturerDeletedDto {
   @ApiProperty({
     description: 'Số trang',
     example: 1,
@@ -719,7 +789,7 @@ export class QueryUserDeletedDto {
   limit?: number = 10;
 
   @ApiProperty({
-    description: 'Từ khóa tìm kiếm (tìm trong họ tên, mã nhân viên, username)',
+    description: 'Từ khóa tìm kiếm (tìm trong họ tên, mã giảng viên mời)',
     required: false,
   })
   @IsOptional()
@@ -772,13 +842,76 @@ export class QueryUserDeletedDto {
     return val;
   })
   areTeaching?: boolean;
+
+  @ApiProperty({
+    description: 'Đào tạo duyệt để lọc',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ obj, key }) => {
+    const val = obj[key];
+    if (val === 'true' || val === '1' || val === 'yes') return true;
+    if (val === 'false' || val === '0' || val === 'no') return false;
+    return val;
+  })
+  trainingApproved?: boolean;
+
+  @ApiProperty({
+    description: 'Khoa duyệt để lọc',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ obj, key }) => {
+    const val = obj[key];
+    if (val === 'true' || val === '1' || val === 'yes') return true;
+    if (val === 'false' || val === '0' || val === 'no') return false;
+    return val;
+  })
+  facultyApproved?: boolean;
+
+  @ApiProperty({
+    description: 'Học viện duyệt để lọc',
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ obj, key }) => {
+    const val = obj[key];
+    if (val === 'true' || val === '1' || val === 'yes') return true;
+    if (val === 'false' || val === '0' || val === 'no') return false;
+    return val;
+  })
+  academyApproved?: boolean;
 }
 
-export class UserParamDto {
+export class VisitingLecturerParamDto {
   @ApiProperty({
-    description: 'ID của nhân viên',
+    description: 'ID của giảng viên mời',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @IsUUID()
   id: string;
+}
+
+export class ApprovalActionDto {
+  @ApiProperty({
+    description: 'Ghi chú khi duyệt hoặc bỏ duyệt',
+    example: 'Hồ sơ đã đầy đủ và phù hợp',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class RejectionActionDto {
+  @ApiProperty({
+    description: 'Lý do bỏ duyệt (bắt buộc)',
+    example: 'Thiếu bằng cấp chứng minh trình độ chuyên môn',
+  })
+  @IsString()
+  @IsNotEmpty()
+  notes: string;
 }

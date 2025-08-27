@@ -42,4 +42,10 @@ export class AccountController {
   ) {
     return this.accountService.update(params.id, updateAccountDto);
   }
+
+  @Get(':id/permissions')
+  @ApiOperation({ summary: 'Lấy tất cả quyền của tài khoản' })
+  getAllPerrmissionOfAccount(@Param() params: AccountParamDto) {
+    return this.accountService.getAllPerrmissionOfAccount(params.id);
+  }
 }

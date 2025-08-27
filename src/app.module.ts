@@ -25,7 +25,9 @@ import { PermissionModule } from './modules/permission/permission.module';
 import { RoleModule } from './modules/role/role.module';
 import { StandardLectureHoursModule } from './modules/standard-lecture-hours/standard-lecture-hours.module';
 import { SubjectModule } from './modules/subject/subject.module';
+import { TimetableModule } from './modules/timetable/timetable.module';
 import { UserModule } from './modules/user/user.module';
+import { VisitingLecturerModule } from './modules/visiting-lecturer/visiting-lecturer.module';
 import { JwtGuard } from './shared/guards/jwt.guard';
 import { CompressionMiddleware } from './shared/middlewares/compression.middleware';
 import { HelmetMiddleware } from './shared/middlewares/helmet.middleware';
@@ -59,9 +61,11 @@ import { SharedModule } from './shared/shared.module';
     StandardLectureHoursModule,
     ExemptionPercentageModule,
     UserModule,
+    VisitingLecturerModule,
     AccountModule,
     AuthModule,
     FilesModule,
+    TimetableModule,
   ],
   controllers: [AppController],
   providers: [

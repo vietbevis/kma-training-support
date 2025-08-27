@@ -220,4 +220,21 @@ export class AccountService {
       });
     }
   }
+
+  async getAllPerrmissionOfAccount(id: string) {
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: {
+        roles: {
+          permissions: true,
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy tài khoản');
+    }
+
+    return user.roles.map((role) => role.permissions).flat();
+  }
 }

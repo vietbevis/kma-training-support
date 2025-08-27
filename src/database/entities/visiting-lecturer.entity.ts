@@ -2,41 +2,26 @@ import { ApiHideProperty } from '@nestjs/swagger';
 import { Exclude } from 'class-transformer';
 import { FileUploadResponseDto } from 'src/modules/files/files.dto';
 import { Gender } from 'src/shared/enums/gender.enum';
-import {
-  Column,
-  Entity,
-  JoinColumn,
-  JoinTable,
-  ManyToMany,
-  ManyToOne,
-} from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { AuditableEntity } from '../base/auditable.entity';
 import { AcademicCredentialsEntity } from './academic-credentials.entity';
 import { ExemptionPercentageEntity } from './exemption-percentage.entity';
 import { FacultyDepartmentEntity } from './faculty-department.entity';
-import { RoleEntity } from './role.entity';
 import { SubjectEntity } from './subject.entity';
+import { UserEntity } from './user.entity';
 
-@Entity('tbl_users')
-export class UserEntity extends AuditableEntity {
+@Entity('tbl_visiting_lecturers')
+export class VisitingLecturerEntity extends AuditableEntity {
   @Column({ name: 'full_name', comment: 'Họ và tên' })
   fullName!: string;
-
-  @Column({ type: 'varchar', unique: true, comment: 'Tên đăng nhập' })
-  username: string;
 
   @Column({
     name: 'code',
     unique: true,
     length: 50,
-    comment: 'Mã nhân viên duy nhất',
+    comment: 'Mã giảng viên mời duy nhất',
   })
   code!: string;
-
-  @Exclude()
-  @ApiHideProperty()
-  @Column({ type: 'varchar', comment: 'Mật khẩu' })
-  password: string;
 
   @Column({
     name: 'gender',
@@ -219,6 +204,38 @@ export class UserEntity extends AuditableEntity {
   qrCode: FileUploadResponseDto;
 
   @Column({
+    name: 'training_approved',
+    type: 'boolean',
+    default: false,
+    comment: 'Đào tạo duyệt',
+  })
+  trainingApproved: boolean;
+
+  @Column({
+    name: 'faculty_approved',
+    type: 'boolean',
+    default: false,
+    comment: 'Khoa duyệt',
+  })
+  facultyApproved: boolean;
+
+  @Column({
+    name: 'academy_approved',
+    type: 'boolean',
+    default: false,
+    comment: 'Học viện duyệt',
+  })
+  academyApproved: boolean;
+
+  @Column({
+    name: 'notes',
+    type: 'text',
+    nullable: true,
+    comment: 'Ghi chú',
+  })
+  notes: string;
+
+  @Column({
     name: 'exemption_percentage_id',
     comment: 'Phần trăm miễn giảm',
     nullable: true,
@@ -235,7 +252,7 @@ export class UserEntity extends AuditableEntity {
     type: 'varchar',
     name: 'subject_id',
     nullable: true,
-    comment: 'Bộ môn (null nếu nhân viên thuộc khoa)',
+    comment: 'Bộ môn (null nếu thuộc khoa)',
   })
   subjectId: string | null;
 
@@ -264,10 +281,6 @@ export class UserEntity extends AuditableEntity {
   @ManyToOne(() => FacultyDepartmentEntity)
   @JoinColumn({ name: 'faculty_department_id' })
   facultyDepartment: FacultyDepartmentEntity;
-
-  @ManyToMany(() => RoleEntity)
-  @JoinTable({ name: 'tbl_user_roles' })
-  roles: RoleEntity[];
 
   @ManyToOne(() => UserEntity, (user) => user.id)
   @JoinColumn({ name: 'created_by_id' })

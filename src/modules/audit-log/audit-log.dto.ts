@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Exclude, Type } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
@@ -287,11 +287,13 @@ export class AuditLogResponseDto {
   @ApiPropertyOptional({
     description: 'Giá trị cũ',
   })
+  @Exclude()
   oldValues?: any;
 
   @ApiPropertyOptional({
     description: 'Giá trị mới',
   })
+  @Exclude()
   newValues?: any;
 
   @ApiPropertyOptional({

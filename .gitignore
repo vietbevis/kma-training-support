@@ -14,6 +14,9 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
+*.xlsx
+*.xls
+
 # OS
 .DS_Store
 

@@ -3,6 +3,7 @@ import { Client } from 'minio';
 import * as sharp from 'sharp';
 import { InjectMinio } from 'src/shared/decorators/minio.decorator';
 import { ConfigService } from 'src/shared/services/config.service';
+import { UserService } from '../user/user.service';
 import {
   FileUploadResponseDto,
   MultipleFileUploadResponseDto,
@@ -34,6 +35,7 @@ export class FilesService {
   constructor(
     @InjectMinio() private readonly minioClient: Client,
     private readonly configService: ConfigService,
+    private readonly userService: UserService,
   ) {
     this.bucketName = this.configService.get('MINIO_BUCKET_NAME');
     this.initializeBucket();
@@ -54,7 +56,7 @@ export class FilesService {
     }
   }
 
-  private generateFileName(originalName: string): string {
+  private generateFileName(originalName: string, folderPath: string): string {
     const timestamp = new Date()
       .toISOString()
       .slice(0, 19)
@@ -62,7 +64,8 @@ export class FilesService {
       .replace('T', '-');
     const randomSuffix = Math.random().toString(36).substring(2, 8);
     const extension = originalName.split('.').pop();
-    return `${timestamp}-${randomSuffix}.${extension}`;
+    const filename = `${timestamp}-${randomSuffix}.${extension}`;
+    return `${folderPath}/${filename}`;
   }
 
   private isImageFile(mimeType: string): boolean {
@@ -123,6 +126,36 @@ export class FilesService {
     }
   }
 
+  private async createFolderPath(userId: string): Promise<string> {
+    try {
+      const user = await this.userService.findOne(userId);
+      if (!user) {
+        throw new BadRequestException('Không tìm thấy thông tin người dùng');
+      }
+
+      // Tạo tên folder từ tên khoa/phòng ban và tên nhân viên
+      const departmentName = this.sanitizeFolderName(
+        user.facultyDepartment.name,
+      );
+      const userName = this.sanitizeFolderName(user.fullName);
+
+      return `${departmentName}/${userName}`;
+    } catch (error) {
+      this.logger.error('❌ Lỗi khi tạo đường dẫn folder:', error);
+      throw new BadRequestException('Không thể tạo đường dẫn folder');
+    }
+  }
+
+  private sanitizeFolderName(name: string): string {
+    // Loại bỏ các ký tự đặc biệt và thay thế bằng dấu gạch ngang
+    return name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Loại bỏ dấu
+      .replace(/[^a-zA-Z0-9\s]/g, '') // Loại bỏ ký tự đặc biệt
+      .replace(/\s+/g, '-') // Thay thế khoảng trắng bằng dấu gạch ngang
+      .toLowerCase();
+  }
+
   private async uploadToMinio(
     buffer: Buffer,
     fileName: string,
@@ -148,11 +181,15 @@ export class FilesService {
     }
   }
 
-  async uploadFile(file: Express.Multer.File): Promise<FileUploadResponseDto> {
+  async uploadFile(
+    file: Express.Multer.File,
+    userId: string,
+  ): Promise<FileUploadResponseDto> {
     this.validateFile(file);
 
     const originalName = file.originalname;
-    const fileName = this.generateFileName(originalName);
+    const folderPath = await this.createFolderPath(userId);
+    const fileName = this.generateFileName(originalName, folderPath);
     const mimeType = file.mimetype;
     let fileBuffer = file.buffer;
     let fileType: 'image' | 'document';
@@ -186,12 +223,13 @@ export class FilesService {
 
   async uploadMultipleFiles(
     files: Express.Multer.File[],
+    userId: string,
   ): Promise<MultipleFileUploadResponseDto> {
     if (!files || files.length === 0) {
       throw new BadRequestException('Không có file nào được upload');
     }
 
-    const uploadPromises = files.map((file) => this.uploadFile(file));
+    const uploadPromises = files.map((file) => this.uploadFile(file, userId));
     const uploadedFiles = await Promise.all(uploadPromises);
 
     const totalSize = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
