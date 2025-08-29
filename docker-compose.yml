@@ -1,3 +1,6 @@
+# file này để khởi chạy các dịch vụ phụ trợ
+# Cần lệnh docker-compose up -d -> tạo container cho Postgres + MinIO, cấu hình đúng port, user/pass, volume dể backend kết nối ngay và dùng
+# Các image này được lấy từ Docker hub chính thức
 services:
   minio:
     image: quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z
@@ -14,17 +17,28 @@ services:
       - miniodata:/var/lib/minio/data
 
   db:
+    # dùng image sẵn trên Docker Hub
     image: postgres:latest
     restart: always
+    # tạo user, password, database mặc định
     environment:
       POSTGRES_USER: postgredb
       POSTGRES_PASSWORD: postgredb
       POSTGRES_DB: kma-training-support
+    # mở port 5432 ra ngoài để có thể connect từ máy host
     ports:
-      - '5432:5432'
+      - '5433:5432'
+    #  gắn một thư mục (volume) để lưu dữ liệu ra ngoài container -> khi container xóa thì dữ liệu vẫn còn
     volumes:
       - pgdata:/var/lib/postgresql/data
 
 volumes:
   pgdata:
   miniodata:
+
+
+  # khi có nhiều service trong cùng một docker-compose.yml, chúng nằm chung trong một mạng nội bộ cho Docker quản lý
+
+
+  # tóm lại file này dùng để tạo môi trường các thứ cho postgres, minio 
+  # việc còn lại là phải tự tạo cấu trúc như table, dữ liệu ...

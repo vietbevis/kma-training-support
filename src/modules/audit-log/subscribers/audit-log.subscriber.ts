@@ -898,7 +898,7 @@ export class AuditLogSubscriber
     }
 
     // Nếu là chuỗi và có thể chuyển thành số
-    if (_.isString(value) && this.isNumericString(value)) {
+    if (_.isString(value) && this.isNumericString(value as string)) {
       const numValue = parseFloat(value as string);
       return numValue as T;
     }
