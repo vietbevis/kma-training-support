@@ -26,7 +26,6 @@ export class AuditableSubscriber
   }
 
   listenTo() {
-    const s =34;
     return AuditableEntity;
   }
 
