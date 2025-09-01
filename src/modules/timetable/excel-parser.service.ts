@@ -27,12 +27,14 @@ export class ExcelParserService {
         const worksheet = workbook.Sheets[sheetName];
 
         // Chuyển đổi sheet thành JSON
+        // chuyển sheet thành mảng 2 chiều
         const rawData = XLSX.utils.sheet_to_json(worksheet, {
           header: 1, // Sử dụng array thay vì object
           defval: null, // Giá trị mặc định cho ô trống
         });
 
         // Parse dữ liệu từ sheet
+        // xử lý từng từng sheet (mảng 2 chiều)
         const sheetData = this.parseSheetData(rawData as any[][], sheetName);
         allData.push(...sheetData);
       }
@@ -55,13 +57,14 @@ export class ExcelParserService {
     // Tìm dòng header (dòng chứa "TT", "Mã HP", "Số TC"...)
     let headerRowIndex = -1;
     for (let i = 0; i < rawData.length; i++) {
+      // kiểm tra từng dòng
       const row = rawData[i];
       if (
         row &&
         row.some(
           (cell: any) =>
             String(cell).includes('TT') ||
-            String(cell).includes('Mã HP') ||
+            String(cell).includes('Mã HP') || // Số SV mới đúng chứ
             String(cell).includes('Số TC'),
         )
       ) {
@@ -76,7 +79,7 @@ export class ExcelParserService {
 
     const headerRow = rawData[headerRowIndex];
 
-    // Map các cột theo header
+    // Map tên cột -> index
     const columnMap = this.mapColumns(headerRow);
 
     // Parse từng dòng dữ liệu
@@ -94,6 +97,7 @@ export class ExcelParserService {
       }
 
       try {
+        // parse dữ liệu thành TimetableUploadDataDto
         const parsedRow = this.parseDataRow(row, columnMap, rawData, i);
         if (parsedRow) {
           result.push(parsedRow);
@@ -192,7 +196,6 @@ export class ExcelParserService {
     );
     let actualActualHours = this.parseNumber(row[columnMap.actualHours]);
     let actualStandardHours = this.parseNumber(row[columnMap.standardHours]);
-
     if (
       (!courseCode || !className) &&
       allRows &&

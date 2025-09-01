@@ -137,14 +137,15 @@ export class TimetableController {
   ) {
     // Parse Excel file and convert to DTO
     const excelData = await this.parseExcelFile(file);
+    return excelData;
 
-    const uploadDto: TimetableUploadDto = {
-      semester,
-      academicYearId,
-      data: excelData,
-    };
+    // const uploadDto: TimetableUploadDto = {
+    //   semester,
+    //   academicYearId,
+    //   data: excelData,
+    // };
 
-    return await this.timetableService.uploadFromExcel(uploadDto);
+    // return await this.timetableService.uploadFromExcel(uploadDto);
   }
 
   @Get(':id')

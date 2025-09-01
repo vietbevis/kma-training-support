@@ -249,6 +249,7 @@ export class TimetableService {
   }
 
   // Upload thời khóa biểu từ Excel
+  // Duyệt qua tất cả các dòng dl được parse, xử lý từng dòng và ghi nhận kết quả
   async uploadFromExcel(uploadDto: TimetableUploadDto): Promise<{
     success: number;
     errors: Array<{ row: number; data: TimetableUploadDataDto; error: string }>;
@@ -264,13 +265,16 @@ export class TimetableService {
 
     for (const [index, item] of uploadDto.data.entries()) {
       try {
+        // xử lý và lưu vào DB
         await this.processExcelRow(
           item,
           uploadDto.semester,
           uploadDto.academicYearId,
         );
+        // nếu thành công -> tăng success
         results.success++;
       } catch (error: any) {
+        // lỗi -> ghi nhận row, data và error.message vào results.errors
         results.errors.push({
           row: index + 1,
           data: item,
@@ -282,23 +286,30 @@ export class TimetableService {
     return results;
   }
 
+  // Xử lý 1 dòng dữ liệu Excel, ánh xạ sang CreateTimeTableDto rồi gọi hàm create để lưu vào DB
   private async processExcelRow(
     data: TimetableUploadDataDto,
     semester: any,
     academicYearId: string,
   ): Promise<void> {
     // Find course by code
+    // Tìm học phần (course) theo courseCode
     const course = await this.courseRepository.findOne({
       where: { courseCode: data.courseCode },
     });
+
+    // nếu không có -> throw error vì chưa có học phần đó mà đã có thời khóa biểu về nó
     if (!course) {
       throw new Error(`Không tìm thấy học phần với mã: ${data.courseCode}`);
     }
 
     // Map class type
+    // Xác định loại lớp
     const classType = data.classType.toUpperCase();
 
     // Find classroom by name (if not LMS or online)
+    // Tìm phòng học nếu roomName # LMS và không rỗng -> tìm trong DB
+    // Nếu không có phòng hoặc lớp online -> để classroomID = undefined
     let classroomId: string | undefined;
     if (data.roomName !== 'LMS' && data.roomName.trim() !== '') {
       const classroom = await this.classroomRepository.findOne({
@@ -311,6 +322,7 @@ export class TimetableService {
     const startDate = this.parseExcelDate(data.startDate);
     const endDate = this.parseExcelDate(data.endDate);
 
+    // tạo DTO 
     const createDto: CreateTimetableDto = {
       className: data.className,
       semester,
@@ -334,13 +346,17 @@ export class TimetableService {
     await this.create(createDto);
   }
 
+  // chuyển đổi chuỗi ngày từ Excel thành đối tượng Date của JS
   private parseExcelDate(dateStr: string): Date {
-    // Parse date from Excel format (DD/MM/YY)
+    // Parse date from Excel format input (DD/MM/YY)
+    // tách chuỗi theo /
     const parts = dateStr.split('/');
+    // nếu không đủ 3 phần -> throw error
     if (parts.length !== 3) {
       throw new Error(`Invalid date format: ${dateStr}`);
     }
 
+    // chuyển day, month, year
     const day = parseInt(parts[0]);
     const month = parseInt(parts[1]) - 1; // Month is 0-indexed
     let year = parseInt(parts[2]);
