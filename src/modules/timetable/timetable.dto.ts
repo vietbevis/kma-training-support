@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayNotEmpty,
   IsArray,
   IsDateString,
   IsEnum,
@@ -212,6 +213,38 @@ export class TimetableConflictCheckDto {
   excludeId?: string;
 }
 
+export class DetailTimeSlotsDto {
+  @ApiProperty({ description: "Số tiết/tuần"})
+  @IsInt()
+  hoursPerWeek!: number;
+
+  @ApiProperty({
+    description: "Thứ",
+    isArray: true,
+    enum: DayOfWeek,
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsEnum(DayOfWeek)
+  dayOfWeek!: DayOfWeek[];
+
+  @ApiProperty({ description: 'Tiết học', example: '1->3' })
+  @IsString()
+  timeSlot!: string;
+
+  @ApiProperty({ description: 'Phòng học' })
+  @IsString()
+  roomName!: string;
+
+  @ApiProperty({ description: 'Ngày bắt đầu', example: '2025-09-15' })
+  @IsDateString()
+  startDate!: string;
+
+  @ApiProperty({ description: 'Ngày kết thúc', example: '2025-12-20' })
+  @IsDateString()
+  endDate!: string;
+}
+
 // DTO cho upload Excel
 export class TimetableUploadDataDto {
   @ApiProperty({ description: 'Số thứ tự' })
@@ -246,6 +279,12 @@ export class TimetableUploadDataDto {
   @IsNumber()
   actualHours!: number;
 
+
+  @ApiProperty({ description: 'Hệ số ngoài giờ' })
+  @IsNumber()
+  overtimeCoefficient!: number;
+
+
   @ApiProperty({ description: 'Số tiết quy chuẩn' })
   @IsNumber()
   standardHours!: number;
@@ -258,31 +297,23 @@ export class TimetableUploadDataDto {
   @IsString()
   classType!: string;
 
-  @ApiProperty({ description: 'Số tiết/tuần' })
-  @IsInt()
-  hoursPerWeek!: number;
+  @IsArray()
+  @ArrayNotEmpty()
+  detailTimeSlots!: DetailTimeSlotsDto[]
 
-  @ApiProperty({ description: 'Thứ' })
-  @IsInt()
-  @Min(1)
-  @Max(7)
-  dayOfWeek!: number;
 
-  @ApiProperty({ description: 'Tiết học' })
-  @IsString()
-  timeSlot!: string;
-
-  @ApiProperty({ description: 'Phòng học' })
-  @IsString()
-  roomName!: string;
-
-  @ApiProperty({ description: 'Ngày bắt đầu' })
-  @IsString()
+  @ApiProperty({ description: 'Ngày bắt đầu', example: '2025-09-15' })
+  @IsDateString()
   startDate!: string;
 
-  @ApiProperty({ description: 'Ngày kết thúc' })
-  @IsString()
+  @ApiProperty({ description: 'Ngày kết thúc', example: '2025-12-20' })
+  @IsDateString()
   endDate!: string;
+
+  @ApiProperty({ description: 'Giáo viên' })
+  @IsString()
+  lecturerName!: string;
+
 }
 
 export class TimetableUploadDto {

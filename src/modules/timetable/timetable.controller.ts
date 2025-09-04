@@ -137,8 +137,8 @@ export class TimetableController {
   ) {
     // Parse Excel file and convert to DTO
     const excelData = await this.parseExcelFile(file);
-    return excelData;
 
+    return excelData;
     // const uploadDto: TimetableUploadDto = {
     //   semester,
     //   academicYearId,

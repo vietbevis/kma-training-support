@@ -310,6 +310,8 @@ export class TimetableService {
     // Find classroom by name (if not LMS or online)
     // Tìm phòng học nếu roomName # LMS và không rỗng -> tìm trong DB
     // Nếu không có phòng hoặc lớp online -> để classroomID = undefined
+    /*
+    Sẽ sửa
     let classroomId: string | undefined;
     if (data.roomName !== 'LMS' && data.roomName.trim() !== '') {
       const classroom = await this.classroomRepository.findOne({
@@ -344,6 +346,7 @@ export class TimetableService {
     };
 
     await this.create(createDto);
+    */
   }
 
   // chuyển đổi chuỗi ngày từ Excel thành đối tượng Date của JS
