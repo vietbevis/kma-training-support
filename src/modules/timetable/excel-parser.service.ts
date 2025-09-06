@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as XLSX from 'xlsx';
 import { TimetableUploadDataDto } from './timetable.dto';
 import { DetailTimeSlotsDto } from './timetable.dto';
+import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
 @Injectable()
 export class ExcelParserService {
   async parseExcelFile(fileBuffer: Buffer): Promise<TimetableUploadDataDto[]> {
@@ -22,7 +23,6 @@ export class ExcelParserService {
           defval: null,
         });
 
-
         const sheetData = this.parseSheetData(rawData as any[][], sheetName);
         allData.push(...sheetData);
       }
@@ -39,9 +39,10 @@ export class ExcelParserService {
   ): TimetableUploadDataDto[] {
     const result: TimetableUploadDataDto[] = [];
     // Loại bỏ dòng trống
-    const filteredData = rawData.filter((row: any[]) => row.some(cell => cell !== null && cell !== undefined && cell !== ''));
+    const filteredData = rawData.filter((row: any[]) =>
+      row.some((cell) => cell !== null && cell !== undefined && cell !== ''),
+    );
 
-   
     let headerRowIndex = -1;
     for (let i = 0; i < filteredData.length; i++) {
       const row = filteredData[i];
@@ -71,40 +72,17 @@ export class ExcelParserService {
       const row = filteredData[i];
       if (!row || row.every((cell) => !cell && cell !== 0)) continue;
 
-      // if(sheetName == "AT18") {
-      //   console.log("i  " + i);
-      // }
-      const courseCode = String(row[columnMap.courseCode] || '').trim();
-
-      // lấy endDate của dòng cuối dùng trong sheet
-      if(currentCourse) {
-        if(i === filteredData.length - 1 && row[columnMap.endDate]) {
-            currentCourse.endDate = this.parseExcelDate(row[columnMap.endDate]);
-          }
-
-        if(i === filteredData.length - 1 && !row[columnMap.endDate]) {
-          for(let j = i - 1; j >= 0; j--){
-            const prevRow = filteredData[j];
-            if(prevRow && prevRow[columnMap.endDate]){
-              currentCourse.endDate = this.parseExcelDate(prevRow[columnMap.endDate]);
-              break;
-            }
-          }
-        }
+      if (!row[columnMap.dayOfWeek] || !row[columnMap.timeSlot]) {
+        // nếu thiếu dayOfWeek hoặc timeSlot thì bỏ qua dòng này
+        continue;
       }
-      
 
-      // Nếu có mã học phần -> bắt đầu course mới
-      if (courseCode) {
+      const courseCode = String(row[columnMap.courseCode] || '').trim();
+      const className = String(row[columnMap.className] || '').trim();
+
+      // Nếu có mã học phần/ tên lớp học phần -> bắt đầu course mới
+      if (courseCode || className) {
         if (currentCourse) {
-          // lấy dòng trên gần nhất để lấy ngày kết thúc
-          for(let j = i - 1; j >= 0; j--){
-            const prevRow = filteredData[j];
-            if(prevRow && prevRow[columnMap.endDate]){
-              currentCourse.endDate = this.parseExcelDate(prevRow[columnMap.endDate]);
-              break;
-            }
-          }
           this.updateCourseDates(currentCourse);
           result.push(currentCourse);
         }
@@ -115,47 +93,73 @@ export class ExcelParserService {
           credits: this.parseNumber(row[columnMap.credits]),
           studentCount: this.parseNumber(row[columnMap.studentCount]),
           theoryHours: this.parseNumber(row[columnMap.theoryHours]),
-          crowdClassCoefficient: this.parseNumber(row[columnMap.crowdClassCoefficient]),
+          crowdClassCoefficient: this.parseNumber(
+            row[columnMap.crowdClassCoefficient],
+          ),
           actualHours: this.parseNumber(row[columnMap.actualHours]),
-          overtimeCoefficient: this.parseNumber(row[columnMap.overtimeCoefficient]),
+          overtimeCoefficient: this.parseNumber(
+            row[columnMap.overtimeCoefficient],
+          ),
           standardHours: this.parseNumber(row[columnMap.standardHours]),
           className: String(row[columnMap.className] || '').trim(),
           classType: String(row[columnMap.classType] || '').trim(),
           lecturerName: String(row[columnMap.lecturerName] || '').trim(),
           startDate: this.parseExcelDate(row[columnMap.startDate]),
-          endDate: '',
+          endDate: this.parseExcelDate(row[columnMap.endDate]),
           detailTimeSlots: [],
         };
       }
 
       if (currentCourse) {
         const detail: DetailTimeSlotsDto = {
-          hoursPerWeek: this.parseNumber(row[columnMap.hoursPerWeek]),
-          dayOfWeek: row[columnMap.dayOfWeek]
-            ? [this.parseNumber(row[columnMap.dayOfWeek])]
-            : [],
+          dayOfWeek: this.parseNumber(row[columnMap.dayOfWeek]),
           timeSlot: String(row[columnMap.timeSlot] || '').trim(),
           roomName: String(row[columnMap.roomName] || '').trim(),
           startDate: this.parseExcelDate(row[columnMap.startDate]),
           endDate: this.parseExcelDate(row[columnMap.endDate]),
         };
 
-        // Gom nếu trùng timeSlot + room + start/end
-        const last = currentCourse.detailTimeSlots[currentCourse.detailTimeSlots.length - 1];
-        if (
-          last &&
-          last.timeSlot === detail.timeSlot &&
-          last.roomName === detail.roomName &&
-          last.startDate === detail.startDate &&
-          last.endDate === detail.endDate
-        ) {
-          last.dayOfWeek.push(...detail.dayOfWeek);
+        // thiếu chi tiết startDate và endDate cho mỗi detailTimeSlot thì lấy dòng trước đó gần nhất có startDate và endDate
+        if (!detail.startDate && !detail.endDate && i > 0) {
+          for (let j = i - 1; j >= 0; j--) {
+            const prevRow = filteredData[j];
+            if (
+              prevRow &&
+              prevRow[columnMap.startDate] &&
+              prevRow[columnMap.endDate]
+            ) {
+              {
+                detail.startDate = this.parseExcelDate(
+                  prevRow[columnMap.startDate],
+                );
+                detail.endDate = this.parseExcelDate(
+                  prevRow[columnMap.endDate],
+                );
+                break;
+              }
+            }
+          }
+        }
+
+        // kiểm tra xem tổ hợp dayOfWeek + timeSlot + room dòng hiện tại đã có trong detailTimeSlots chưa
+        // nếu có thì gộp vào và thay đổi endDate của bản trước đó bằng endDate của dòng hiện tại.
+        // nếu chưa thì push vào mảng detailTimeSlots
+
+        const existingDetail = currentCourse.detailTimeSlots.find(
+          (eachDetail) =>
+            eachDetail.dayOfWeek === detail.dayOfWeek &&
+            eachDetail.timeSlot === detail.timeSlot &&
+            eachDetail.roomName === detail.roomName,
+        );
+        if (existingDetail) {
+          existingDetail.endDate = detail.endDate;
         } else {
           currentCourse.detailTimeSlots.push(detail);
         }
       }
     }
 
+    // push bản ghi cuối cùng trong sheet
     if (currentCourse) {
       this.updateCourseDates(currentCourse);
       result.push(currentCourse);
@@ -189,7 +193,10 @@ export class ExcelParserService {
       else if (header.includes('ngoài giờ') || header.includes('ngoai gio'))
         columnMap.overtimeCoefficient = i;
       else if (header.includes('qc')) columnMap.standardHours = i;
-      else if (header.includes('lớp học phần') || header.includes('lop hoc phan'))
+      else if (
+        header.includes('lớp học phần') ||
+        header.includes('lop hoc phan')
+      )
         columnMap.className = i;
       else if (header.includes('hình thức') || header.includes('hinh thuc'))
         columnMap.classType = i;
@@ -213,36 +220,80 @@ export class ExcelParserService {
   }
 
   private parseNumber(value: any): number {
-    if (value === null || value === undefined || value === '') return 0;
+    if (value === null || value === undefined || value === '') {
+      return 0;
+    }
+
+    // Nếu là string chứa công thức Excel, thử parse kết quả
+    if (typeof value === 'string' && value.startsWith('=')) {
+      // Đối với các công thức đơn giản, có thể eval (cẩn thận với security)
+      // Ở đây chỉ return 0, sẽ cần logic phức tạp hơn để parse công thức Excel
+      return 0;
+    }
+
+    if (value === 'CN') {
+      return DayOfWeek.SUNDAY;
+    }
+
     const num = Number(value);
     if (isNaN(num)) return 0;
-    return num;
+
+    // Nếu là số nguyên -> giữ nguyên
+    if (Number.isInteger(num)) {
+      return num;
+    }
+
+    // Nếu là số thập phân -> lấy 1 số sau dấu phẩy
+    return Math.round(num * 10) / 10;
   }
 
+  // chuyển ngày đọc từ excel về định dạng yyyy-MM-dd
   private parseExcelDate(value: any): string {
     if (!value) return '';
     if (typeof value === 'number') {
       const excelDate = XLSX.SSF.parse_date_code(value);
-      return `${String(excelDate.d).padStart(2, '0')}/${String(
-        excelDate.m,
-      ).padStart(2, '0')}/${excelDate.y}`;
+      return `${excelDate.y}-${String(excelDate.m).padStart(2, '0')}-${String(
+        excelDate.d,
+      ).padStart(2, '0')}`;
     }
     if (value instanceof Date) {
       const d = String(value.getDate()).padStart(2, '0');
       const m = String(value.getMonth() + 1).padStart(2, '0');
       const y = value.getFullYear();
-      return `${d}/${m}/${y}`;
+      return `${y}-${m}-${d}`;
     }
-    return String(value).trim();
+
+    // xử lý chuỗi dạng dd/MM/yyyy hoặc dd/MM/yy
+    const str = String(value).trim();
+    if (str.includes('/')) {
+      const [d, m, y] = str.split('/');
+      const fullYear = y.length === 2 ? `20${y}` : y; // nếu yy thì thêm "20"
+      return `${fullYear}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+
+    return str; // fallback: giữ nguyên (hiếm khi cần)
   }
 
   private updateCourseDates(course: TimetableUploadDataDto) {
     if (!course.detailTimeSlots.length) return;
+
+    // parse dd/MM/yyyy hoặc yyyy-MM-dd về Date
+    const parseToDate = (dateStr: string) => {
+      if (!dateStr) return new Date('');
+      // nếu chuỗi có dạng dd/MM/yyyy
+      if (dateStr.includes('/')) {
+        const [d, m, y] = dateStr.split('/');
+        return new Date(`${y}-${m}-${d}`);
+      }
+      return new Date(dateStr); // yyyy-MM-dd
+    };
+
     const startDates = course.detailTimeSlots
-      .map((d) => new Date(d.startDate.split('/').reverse().join('-')))
+      .map((d) => parseToDate(d.startDate))
       .filter((d) => !isNaN(d.getTime()));
+
     const endDates = course.detailTimeSlots
-      .map((d) => new Date(d.endDate.split('/').reverse().join('-')))
+      .map((d) => parseToDate(d.endDate))
       .filter((d) => !isNaN(d.getTime()));
 
     if (startDates.length && endDates.length) {
@@ -257,6 +308,6 @@ export class ExcelParserService {
     const d = date.getDate().toString().padStart(2, '0');
     const m = (date.getMonth() + 1).toString().padStart(2, '0');
     const y = date.getFullYear();
-    return `${d}/${m}/${y}`;
+    return `${y}-${m}-${d}`;
   }
 }

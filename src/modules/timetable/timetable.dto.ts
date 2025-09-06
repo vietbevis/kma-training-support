@@ -214,19 +214,13 @@ export class TimetableConflictCheckDto {
 }
 
 export class DetailTimeSlotsDto {
-  @ApiProperty({ description: "Số tiết/tuần"})
-  @IsInt()
-  hoursPerWeek!: number;
-
   @ApiProperty({
     description: "Thứ",
-    isArray: true,
     enum: DayOfWeek,
   })
-  @IsArray()
-  @ArrayNotEmpty()
+
   @IsEnum(DayOfWeek)
-  dayOfWeek!: DayOfWeek[];
+  dayOfWeek!: DayOfWeek;
 
   @ApiProperty({ description: 'Tiết học', example: '1->3' })
   @IsString()
