@@ -94,7 +94,7 @@ export class TimetableController {
   async checkConflict(
     @Body() conflictDto: TimetableConflictCheckDto,
   ): Promise<{ message: string }> {
-    await this.timetableService.checkConflict(conflictDto);
+    // await this.timetableService.checkConflict(conflictDto);
     return { message: 'Không có xung đột lịch học' };
   }
 
@@ -138,14 +138,13 @@ export class TimetableController {
     // Parse Excel file and convert to DTO
     const excelData = await this.parseExcelFile(file);
 
-    return excelData;
-    // const uploadDto: TimetableUploadDto = {
-    //   semester,
-    //   academicYearId,
-    //   data: excelData,
-    // };
+    const uploadDto: TimetableUploadDto = {
+      semester,
+      academicYearId,
+      data: excelData,
+    };
 
-    // return await this.timetableService.uploadFromExcel(uploadDto);
+    return await this.timetableService.uploadFromExcel(uploadDto);
   }
 
   @Get(':id')

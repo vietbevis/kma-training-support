@@ -111,13 +111,31 @@ export class ExcelParserService {
       }
 
       if (currentCourse) {
-        const detail: DetailTimeSlotsDto = {
+        const rawRoom = String(row[columnMap.roomName] || '').trim();
+
+        let roomName = '';
+        let buildingName: string | undefined = undefined;
+
+        if (rawRoom.includes('-')) {
+          const parts = rawRoom.split('-').map((s) => s.trim());
+          roomName = parts[0] || '';
+          buildingName = parts[1] || undefined;
+        } else {
+          roomName = rawRoom;
+        }
+
+        const detail: any = {
           dayOfWeek: this.parseNumber(row[columnMap.dayOfWeek]),
           timeSlot: String(row[columnMap.timeSlot] || '').trim(),
-          roomName: String(row[columnMap.roomName] || '').trim(),
+          roomName,
           startDate: this.parseExcelDate(row[columnMap.startDate]),
           endDate: this.parseExcelDate(row[columnMap.endDate]),
         };
+
+        // chỉ thêm buildingName nếu có
+        if (buildingName) {
+          detail.buildingName = buildingName;
+        }
 
         // thiếu chi tiết startDate và endDate cho mỗi detailTimeSlot thì lấy dòng trước đó gần nhất có startDate và endDate
         if (!detail.startDate && !detail.endDate && i > 0) {

@@ -17,15 +17,46 @@ import {
 import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
 import { KyHoc } from 'src/shared/enums/semester.enum';
 
+
+export class DetailTimeSlotsDto {
+  @ApiProperty({
+    description: "Thứ",
+    enum: DayOfWeek,
+  })
+
+  @IsEnum(DayOfWeek)
+  dayOfWeek!: DayOfWeek;
+
+  @ApiProperty({ description: 'Tiết học', example: '1->3' })
+  @IsString()
+  timeSlot!: string;
+
+  @ApiProperty({ description: 'Phòng học' })
+  @IsString()
+  roomName!: string;
+
+
+  @ApiPropertyOptional({ description: 'Tòa nhà' })
+  @IsOptional()
+  @IsString()
+  buildingName?: string;
+
+
+
+  @ApiProperty({ description: 'Ngày bắt đầu', example: '2025-09-15' })
+  @IsDateString()
+  startDate!: string;
+
+  @ApiProperty({ description: 'Ngày kết thúc', example: '2025-12-20' })
+  @IsDateString()
+  endDate!: string;
+}
+
+
 export class CreateTimetableDto {
   @ApiProperty({ description: 'Tên lớp học phần cụ thể' })
   @IsString()
   className!: string;
-
-  @ApiPropertyOptional({ description: 'Mã lớp học phần' })
-  @IsOptional()
-  @IsString()
-  classCode?: string;
 
   @ApiProperty({ enum: KyHoc, description: 'Kỳ học' })
   @IsEnum(KyHoc)
@@ -56,24 +87,19 @@ export class CreateTimetableDto {
   @Min(0)
   actualHours!: number;
 
+
+  @ApiProperty({ description: 'Hệ số ngoài giờ' })
+  @IsNumber()
+  @Min(0)
+  overtimeCoefficient!: number;
+
+
+
   @ApiProperty({ description: 'Số tiết quy chuẩn' })
   @IsNumber()
   @Min(0)
   standardHours!: number;
 
-  @ApiProperty({ description: 'Số tiết/tuần' })
-  @IsInt()
-  @Min(1)
-  @Max(20)
-  hoursPerWeek!: number;
-
-  @ApiProperty({ enum: DayOfWeek, description: 'Thứ trong tuần' })
-  @IsEnum(DayOfWeek)
-  dayOfWeek!: DayOfWeek;
-
-  @ApiProperty({ description: 'Tiết học (VD: "1->3", "13->16")' })
-  @IsString()
-  timeSlot!: string;
 
   @ApiProperty({ description: 'Ngày bắt đầu' })
   @IsDateString()
@@ -88,38 +114,30 @@ export class CreateTimetableDto {
   @IsString()
   lecturerName?: string;
 
+  @ApiProperty({
+    description: 'Chi tiết lịch học',
+    type: [DetailTimeSlotsDto],
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => DetailTimeSlotsDto)
+  detailTimeSlots!: DetailTimeSlotsDto[];
+
   @ApiPropertyOptional({ description: 'Ghi chú' })
   @IsOptional()
   @IsString()
   notes?: string;
 
-  @ApiProperty({ description: 'ID học phần' })
+  @ApiPropertyOptional({ description: 'ID học phần' })
+  @IsOptional()
   @IsUUID()
-  courseId!: string;
+  courseId?: string;
 
   @ApiProperty({ description: 'ID năm học' })
   @IsUUID()
   academicYearId!: string;
 
-  @ApiPropertyOptional({ description: 'ID khoa/bộ môn' })
-  @IsOptional()
-  @IsUUID()
-  facultyDepartmentId?: string;
-
-  @ApiPropertyOptional({ description: 'ID phòng học' })
-  @IsOptional()
-  @IsUUID()
-  classroomId?: string;
-
-  @ApiPropertyOptional({ description: 'ID giảng viên' })
-  @IsOptional()
-  @IsUUID()
-  lecturerId?: string;
-
-  @ApiPropertyOptional({ description: 'Tên phòng học gốc từ file Excel' })
-  @IsOptional()
-  @IsString()
-  roomName?: string;
 }
 
 export class UpdateTimetableDto extends PartialType(CreateTimetableDto) {}
@@ -139,21 +157,6 @@ export class TimetableQueryDto {
   @IsOptional()
   @IsEnum(KyHoc)
   semester?: KyHoc;
-
-  @ApiPropertyOptional({ enum: DayOfWeek, description: 'Thứ trong tuần' })
-  @IsOptional()
-  @IsEnum(DayOfWeek)
-  dayOfWeek?: DayOfWeek;
-
-  @ApiPropertyOptional({ description: 'ID phòng học' })
-  @IsOptional()
-  @IsUUID()
-  classroomId?: string;
-
-  @ApiPropertyOptional({ description: 'ID giảng viên' })
-  @IsOptional()
-  @IsUUID()
-  lecturerId?: string;
 
   @ApiPropertyOptional({ description: 'Ngày bắt đầu tìm kiếm' })
   @IsOptional()
@@ -175,7 +178,7 @@ export class TimetableQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number = 1;
+  page: number = 1;
 
   @ApiPropertyOptional({ description: 'Số bản ghi mỗi trang', default: 20 })
   @IsOptional()
@@ -183,13 +186,15 @@ export class TimetableQueryDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  limit?: number = 20;
+  limit: number = 20;
 }
 
+
 export class TimetableConflictCheckDto {
-  @ApiProperty({ description: 'ID phòng học' })
-  @IsUUID()
-  classroomId!: string;
+
+  @ApiProperty({ description: 'Tên phòng học' })
+  @IsString()
+  roomName!: string;
 
   @ApiProperty({ enum: DayOfWeek, description: 'Thứ trong tuần' })
   @IsEnum(DayOfWeek)
@@ -213,31 +218,6 @@ export class TimetableConflictCheckDto {
   excludeId?: string;
 }
 
-export class DetailTimeSlotsDto {
-  @ApiProperty({
-    description: "Thứ",
-    enum: DayOfWeek,
-  })
-
-  @IsEnum(DayOfWeek)
-  dayOfWeek!: DayOfWeek;
-
-  @ApiProperty({ description: 'Tiết học', example: '1->3' })
-  @IsString()
-  timeSlot!: string;
-
-  @ApiProperty({ description: 'Phòng học' })
-  @IsString()
-  roomName!: string;
-
-  @ApiProperty({ description: 'Ngày bắt đầu', example: '2025-09-15' })
-  @IsDateString()
-  startDate!: string;
-
-  @ApiProperty({ description: 'Ngày kết thúc', example: '2025-12-20' })
-  @IsDateString()
-  endDate!: string;
-}
 
 // DTO cho upload Excel
 export class TimetableUploadDataDto {
