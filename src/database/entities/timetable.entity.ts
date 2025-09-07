@@ -17,6 +17,7 @@ import { ClassroomEntity } from './classrooms.entity';
 import { CourseEntity } from './course.entity';
 import { FacultyDepartmentEntity } from './faculty-department.entity';
 import { UserEntity } from './user.entity';
+import { DetailTimeSlot } from '../interface/detail-time-slot.interface';
 
 @Entity('tbl_timetables')
 export class TimetableEntity extends AuditableEntity {
@@ -138,14 +139,7 @@ export class TimetableEntity extends AuditableEntity {
     nullable: false,
     comment: 'Chi tiết lịch học (mảng các slot)',
   })
-  detailTimeSlots!: {
-    dayOfWeek: DayOfWeek; // lưu enum dưới dạng số
-    timeSlot: string;
-    roomName: string;
-    buildingName?: string; // optional
-    startDate: string; // ISO format
-    endDate: string;
-  }[];
+  detailTimeSlots!: DetailTimeSlot[];
 
   @Column({
     name: 'notes',

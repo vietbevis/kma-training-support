@@ -62,6 +62,7 @@ export class CreateTimetableDto {
   @IsEnum(KyHoc)
   semester!: KyHoc;
 
+
   @ApiProperty({ description: 'Hình thức học' })
   @IsString()
   classType!: string;
@@ -129,10 +130,9 @@ export class CreateTimetableDto {
   @IsString()
   notes?: string;
 
-  @ApiPropertyOptional({ description: 'ID học phần' })
-  @IsOptional()
+  @ApiProperty({ description: 'ID học phần' })
   @IsUUID()
-  courseId?: string;
+  courseId!: string;
 
   @ApiProperty({ description: 'ID năm học' })
   @IsUUID()
@@ -195,6 +195,11 @@ export class TimetableConflictCheckDto {
   @ApiProperty({ description: 'Tên phòng học' })
   @IsString()
   roomName!: string;
+
+  @ApiPropertyOptional({ description: 'Tên tòa nhà' })
+  @IsOptional()
+  @IsString()
+  buildingName?: string;
 
   @ApiProperty({ enum: DayOfWeek, description: 'Thứ trong tuần' })
   @IsEnum(DayOfWeek)
@@ -291,13 +296,6 @@ export class TimetableUploadDataDto {
 }
 
 export class TimetableUploadDto {
-  @ApiProperty({ description: 'Kỳ học' })
-  @IsEnum(KyHoc)
-  semester!: KyHoc;
-
-  @ApiProperty({ description: 'ID năm học' })
-  @IsUUID()
-  academicYearId!: string;
 
   @ApiProperty({ description: 'Danh sách dữ liệu thời khóa biểu' })
   @IsArray()
@@ -306,55 +304,74 @@ export class TimetableUploadDto {
   data!: TimetableUploadDataDto[];
 }
 
-export class TimetableResponseDto {
-  @ApiProperty({ description: 'ID' })
-  id!: string;
 
-  @ApiProperty({ description: 'Tên lớp học phần' })
-  className!: string;
+// export class CourseResponseDto {
+//   id!: string;
+//   courseCode!: string;
+//   courseName!: string;
+//   credits!: number;
+//   semester!: KyHoc;
+//   description?: string
+// }
 
-  @ApiProperty({ description: 'Mã lớp học phần' })
-  classCode?: string;
+// export class AcademicYearResponseDto {
+//   id!: string;
+//   yearCode!: string;
+// }
 
-  @ApiProperty({ enum: KyHoc })
-  semester!: KyHoc;
+// // không cần validate trong response
+// export class TimetableResponseDto {
+//   @ApiProperty({ description: 'ID' })
+//   id!: string;
 
-  @ApiProperty({ description: 'Hình thức học' })
-  classType!: string;
+//   @ApiProperty({ description: 'Tên lớp học phần' })
+//   className!: string;
 
-  @ApiProperty({ description: 'Số sinh viên' })
-  studentCount!: number;
+//   @ApiProperty({ enum: KyHoc, description: 'Kỳ học' })
+//   semester!: KyHoc;
 
-  @ApiProperty({ description: 'Số tiết/tuần' })
-  hoursPerWeek!: number;
+//   @ApiProperty({ description: 'Hình thức học' })
+//   classType!: string;
 
-  @ApiProperty({ enum: DayOfWeek })
-  dayOfWeek!: DayOfWeek;
+//   @ApiProperty({ description: 'Số sinh viên' })
+//   studentCount!: number;
 
-  @ApiProperty({ description: 'Tiết học' })
-  timeSlot!: string;
+//   @ApiProperty({ description: 'Số tiết lý thuyết' })
+//   theoryHours!: number;
 
-  @ApiProperty({ description: 'Ngày bắt đầu' })
-  startDate!: Date;
+//   @ApiProperty({ description: 'Hệ số lớp đông' })
+//   crowdClassCoefficient!: number;
 
-  @ApiProperty({ description: 'Ngày kết thúc' })
-  endDate!: Date;
+//   @ApiProperty({ description: 'Số tiết thực (tính hệ số)' })
+//   actualHours!: number;
 
-  @ApiProperty({ description: 'Tên giảng viên' })
-  lecturerName?: string;
+//   @ApiProperty({ description: 'Hệ số ngoài giờ' })
+//   overtimeCoefficient!: number;
 
-  @ApiProperty({ description: 'Tên phòng học' })
-  roomName?: string;
+//   @ApiProperty({ description: 'Số tiết quy chuẩn' })
+//   standardHours!: number;
 
-  @ApiProperty({ description: 'Thông tin học phần' })
-  course?: any;
+//   @ApiProperty({ description: 'Ngày bắt đầu' })
+//   startDate!: string;
 
-  @ApiProperty({ description: 'Thông tin năm học' })
-  academicYear?: any;
+//   @ApiProperty({ description: 'Ngày kết thúc' })
+//   endDate!: string;
 
-  @ApiProperty({ description: 'Thông tin phòng học' })
-  classroom?: any;
+//   @ApiPropertyOptional({ description: 'Tên giảng viên' })
+//   lecturerName?: string;
 
-  @ApiProperty({ description: 'Thông tin giảng viên' })
-  lecturer?: any;
-}
+//   @ApiProperty({ description: 'Thông tin học phần' })
+//   course!: CourseResponseDto;
+
+//   @ApiProperty({ description: 'Thông tin năm học' })
+//   academicYear!: AcademicYearResponseDto;
+
+//   @ApiProperty({
+//     description: 'Chi tiết lịch học',
+//     type: [DetailTimeSlotsDto],
+//   })
+//   detailTimeSlots!: DetailTimeSlotsDto[];
+
+//   @ApiPropertyOptional({ description: 'Ghi chú' })
+//   notes?: string;
+// }

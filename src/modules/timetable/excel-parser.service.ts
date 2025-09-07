@@ -164,10 +164,24 @@ export class ExcelParserService {
         // nếu chưa thì push vào mảng detailTimeSlots
 
         const existingDetail = currentCourse.detailTimeSlots.find(
-          (eachDetail) =>
-            eachDetail.dayOfWeek === detail.dayOfWeek &&
-            eachDetail.timeSlot === detail.timeSlot &&
-            eachDetail.roomName === detail.roomName,
+          (eachDetail) => {
+            // Kiểm tra điều kiện cơ bản
+            const sameSlot =
+              eachDetail.dayOfWeek === detail.dayOfWeek &&
+              eachDetail.timeSlot === detail.timeSlot &&
+              eachDetail.roomName === detail.roomName;
+
+            if (!sameSlot) return false;
+
+            // Tính khoảng cách ngày
+            const endDate = new Date(eachDetail.endDate);
+            const startDate = new Date(detail.startDate);
+
+            const diffTime = Math.abs(startDate.getTime() - endDate.getTime());
+            const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+            return diffDays <= 2;
+          },
         );
         if (existingDetail) {
           existingDetail.endDate = detail.endDate;
