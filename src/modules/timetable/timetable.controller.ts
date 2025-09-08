@@ -24,7 +24,6 @@ import {
 } from '@nestjs/swagger';
 import { TimetableEntity } from 'src/database/entities/timetable.entity';
 import { Public } from 'src/shared/decorators/public.decorator';
-import { KyHoc } from 'src/shared/enums/semester.enum';
 import { ExcelFileValidator } from './excel-file.validator';
 import { ExcelParserService } from './excel-parser.service';
 import {
@@ -102,14 +101,6 @@ export class TimetableController {
         file: {
           type: 'string',
           format: 'binary',
-        },
-        semester: {
-          type: 'string',
-          enum: Object.values(KyHoc),
-        },
-        academicYearId: {
-          type: 'string',
-          format: 'uuid',
         },
       },
     },
