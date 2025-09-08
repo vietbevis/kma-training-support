@@ -12,10 +12,6 @@ export class ExcelParserService {
       const allData: TimetableUploadDataDto[] = [];
 
       for (const sheetName of sheetNames) {
-        if (sheetName.includes('A20') || sheetName.includes('A21')) {
-          continue;
-        }
-
         const worksheet = workbook.Sheets[sheetName];
         const rawData = XLSX.utils.sheet_to_json(worksheet, {
           header: 1,

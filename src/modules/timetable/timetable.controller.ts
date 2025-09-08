@@ -26,8 +26,6 @@ import { TimetableEntity } from 'src/database/entities/timetable.entity';
 import { ExcelFileValidator } from './excel-file.validator';
 import { ExcelParserService } from './excel-parser.service';
 import {
-  CreateTimetableDto,
-  TimetableConflictCheckDto,
   TimetableQueryDto,
   TimetableUploadDto,
   UpdateTimetableDto,
@@ -42,49 +40,13 @@ export class TimetableController {
     private readonly excelParserService: ExcelParserService,
   ) {}
 
-  @Post()
-  @ApiOperation({ summary: 'Tạo thời khóa biểu mới' })
-  @HttpCode(HttpStatus.CREATED)
-  async create(
-    @Body() createTimetableDto: CreateTimetableDto,
-  ): Promise<TimetableEntity> {
-    return await this.timetableService.create(createTimetableDto);
-  }
-
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách thời khóa biểu' })
+  @ApiOperation({
+    summary:
+      'Lấy thời khóa biểu (danh sách các lớp học phần trong thời khoá biểu)',
+  })
   async findAll(@Query() query: TimetableQueryDto) {
     return await this.timetableService.findAll(query);
-  }
-
-  // @Get('weekly-schedule')
-  // @ApiOperation({ summary: 'Lấy thời khóa biểu theo tuần' })
-  // @ApiQuery({ name: 'academicYearId', description: 'ID năm học' })
-  // @ApiQuery({ name: 'semester', enum: KyHoc, description: 'Kỳ học' })
-  // @ApiQuery({
-  //   name: 'week',
-  //   description: 'Ngày trong tuần muốn xem (YYYY-MM-DD)',
-  // })
-  // async getWeeklySchedule(
-  //   @Query('academicYearId') academicYearId: string,
-  //   @Query('semester') semester: KyHoc,
-  //   @Query('week') week: string,
-  // ) {
-  //   return await this.timetableService.getWeeklySchedule(
-  //     academicYearId,
-  //     semester,
-  //     new Date(week),
-  //   );
-  // }
-
-  @Post('check-conflict')
-  @ApiOperation({ summary: 'Kiểm tra xung đột lịch học' })
-  @HttpCode(HttpStatus.OK)
-  async checkConflict(
-    @Body() conflictDto: TimetableConflictCheckDto,
-  ): Promise<{ message: string }> {
-    await this.timetableService.checkConflict(conflictDto);
-    return { message: 'Không có xung đột lịch học' };
   }
 
   @Post('upload-excel')
@@ -126,7 +88,10 @@ export class TimetableController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Lấy thông tin thời khóa biểu theo ID' })
+  @ApiOperation({
+    summary:
+      'Lấy thông tin lớp học phần trong thời khóa biểu theo ID của lớp học phần',
+  })
   @ApiParam({ name: 'id', description: 'ID thời khóa biểu' })
   @HttpCode(HttpStatus.OK)
   async findOne(@Param('id') id: string): Promise<TimetableEntity> {
@@ -134,7 +99,7 @@ export class TimetableController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Cập nhật thời khóa biểu' })
+  @ApiOperation({ summary: 'Cập nhật lớp học phần trong thời khóa biểu' })
   @ApiParam({ name: 'id', description: 'ID thời khóa biểu' })
   @HttpCode(HttpStatus.OK)
   async update(
@@ -145,7 +110,7 @@ export class TimetableController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Xóa thời khóa biểu' })
+  @ApiOperation({ summary: 'Xóa lớp học phần trong thời khóa biểu' })
   @ApiParam({ name: 'id', description: 'ID thời khóa biểu' })
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string): Promise<{ message: string }> {

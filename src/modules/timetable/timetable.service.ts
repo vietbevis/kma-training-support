@@ -345,27 +345,9 @@ export class TimetableService {
 
     // Find course by code
     // 1. Tìm học phần (course) theo courseCode
-    let course = await manager.findOne(CourseEntity, {
-      where: { courseCode: data.courseCode },
-    });
-
-    if (!course) {
-      try {
-        course = manager.create(CourseEntity, {
-          courseCode: data.courseCode,
-          courseName: data.className.replace(/\s*\([^)]*\)\s*$/, ''),
-          credits: data.credits,
-          semester,
-        });
-        course = await manager.save(CourseEntity, course);
-      } catch (error) {
-        console.error(`Error creating course ${data.courseCode}:`, error);
-        throw error; // hoặc return để không chạy tiếp
-      }
-    }
+    const course = await this.getOrCreateCourse(data, semester, manager);
 
     // 2. Tìm hoặc tạo Academic Year nếu chưa có
-
     const academicYearId = await this.getOrCreateAcademicYear(data, manager);
 
     // Map class type
@@ -394,14 +376,16 @@ export class TimetableService {
     await this.createWithManager(createDto, manager);
   }
 
-  private extractSchoolYear(className: string): string {
+  private extractSchoolYear(className: string, startDate: string): string {
     // Bỏ phần (D601)
     const cleaned = className.replace(/\s*\([^)]*\)\s*$/, '');
 
     // Lấy số cuối cùng sau khi bỏ ngoặc
     const match = cleaned.match(/(\d+)(?!.*\d)/);
-    if (!match)
-      throw new Error(`Không tìm thấy số trong className: ${className}`);
+    if (!match) {
+      const year = new Date(startDate).getFullYear();
+      return `${year}-${year + 1}`;
+    }
 
     const number = parseInt(match[1], 10); // 25
     const startYear = number < 100 ? 2000 + number : number; // 2025
@@ -410,11 +394,40 @@ export class TimetableService {
     return `${startYear}-${endYear}`;
   }
 
+  private async getOrCreateCourse(
+    data: TimetableUploadDataDto,
+    semester: KyHoc,
+    manager: EntityManager,
+  ): Promise<CourseEntity> {
+    let course = await manager.findOne(CourseEntity, {
+      where: { courseCode: data.courseCode },
+    });
+
+    if (!course) {
+      try {
+        course = manager.create(CourseEntity, {
+          courseCode: data.courseCode,
+          courseName: data.className.replace(/\s*\([^)]*\)\s*$/, ''),
+          credits: data.credits,
+          semester,
+        });
+        course = await manager.save(CourseEntity, course);
+      } catch (error) {
+        console.error(`Error creating course ${data.courseCode}:`, error);
+        throw error; // hoặc return để không chạy tiếp
+      }
+    }
+    return course;
+  }
+
   private async getOrCreateAcademicYear(
     data: TimetableUploadDataDto,
     manager: EntityManager,
   ): Promise<string> {
-    const extractedYear = this.extractSchoolYear(data.className);
+    const extractedYear = this.extractSchoolYear(
+      data.className,
+      data.startDate,
+    );
 
     let year = await manager.findOne(AcademicYearEntity, {
       where: { yearCode: extractedYear },
