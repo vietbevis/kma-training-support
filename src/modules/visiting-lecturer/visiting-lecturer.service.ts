@@ -614,7 +614,7 @@ export class VisitingLecturerService {
     }
   }
 
-  async academyRejectFaculty(id: string, rejectionDto: RejectionActionDto) {
+  async academyReject(id: string, rejectionDto: RejectionActionDto) {
     try {
       const visitingLecturer = await this.visitingLecturerRepository.findOne({
         where: { id },
@@ -632,8 +632,8 @@ export class VisitingLecturerService {
 
       await this.visitingLecturerRepository.save(visitingLecturer);
 
-      this.logger.log(`Học viện đã bỏ duyệt Khoa cho giảng viên mời ${id}`);
-      return { message: 'Học viện đã bỏ duyệt Khoa', id };
+      this.logger.log(`Học viện đã bỏ duyệt giảng viên mời ${id}`);
+      return { message: 'Học viện đã bỏ duyệt giảng viên mời', id };
     } catch (error) {
       if (
         error instanceof NotFoundException ||
@@ -641,7 +641,7 @@ export class VisitingLecturerService {
       ) {
         throw error;
       }
-      this.logger.error('Lỗi khi học viện bỏ duyệt Khoa', error);
+      this.logger.error('Lỗi khi học viện bỏ duyệt giảng viên mời', error);
       throw new BadRequestException('Không thể thực hiện bỏ duyệt');
     }
   }

@@ -146,16 +146,13 @@ export class VisitingLecturerController {
     );
   }
 
-  @Post(':id/academy-reject-faculty')
+  @Post(':id/academy-reject')
   @ApiOperation({ summary: 'Học viện bỏ duyệt giảng viên mời' })
   @HttpCode(HttpStatus.OK)
-  academyRejectFaculty(
+  academyReject(
     @Param() params: VisitingLecturerParamDto,
     @Body() rejectionDto: RejectionActionDto,
   ) {
-    return this.visitingLecturerService.academyRejectFaculty(
-      params.id,
-      rejectionDto,
-    );
+    return this.visitingLecturerService.academyReject(params.id, rejectionDto);
   }
 }
