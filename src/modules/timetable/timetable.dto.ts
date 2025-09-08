@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayNotEmpty,
   IsArray,
   IsDateString,
   IsEnum,
@@ -16,15 +17,40 @@ import {
 import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
 import { KyHoc } from 'src/shared/enums/semester.enum';
 
+export class DetailTimeSlotsDto {
+  @ApiProperty({
+    description: 'Thứ',
+    enum: DayOfWeek,
+  })
+  @IsEnum(DayOfWeek)
+  dayOfWeek!: DayOfWeek;
+
+  @ApiProperty({ description: 'Tiết học', example: '1->3' })
+  @IsString()
+  timeSlot!: string;
+
+  @ApiProperty({ description: 'Phòng học' })
+  @IsString()
+  roomName!: string;
+
+  @ApiPropertyOptional({ description: 'Tòa nhà' })
+  @IsOptional()
+  @IsString()
+  buildingName?: string;
+
+  @ApiProperty({ description: 'Ngày bắt đầu', example: '2025-09-15' })
+  @IsDateString()
+  startDate!: string;
+
+  @ApiProperty({ description: 'Ngày kết thúc', example: '2025-12-20' })
+  @IsDateString()
+  endDate!: string;
+}
+
 export class CreateTimetableDto {
   @ApiProperty({ description: 'Tên lớp học phần cụ thể' })
   @IsString()
   className!: string;
-
-  @ApiPropertyOptional({ description: 'Mã lớp học phần' })
-  @IsOptional()
-  @IsString()
-  classCode?: string;
 
   @ApiProperty({ enum: KyHoc, description: 'Kỳ học' })
   @IsEnum(KyHoc)
@@ -55,24 +81,15 @@ export class CreateTimetableDto {
   @Min(0)
   actualHours!: number;
 
+  @ApiProperty({ description: 'Hệ số ngoài giờ' })
+  @IsNumber()
+  @Min(0)
+  overtimeCoefficient!: number;
+
   @ApiProperty({ description: 'Số tiết quy chuẩn' })
   @IsNumber()
   @Min(0)
   standardHours!: number;
-
-  @ApiProperty({ description: 'Số tiết/tuần' })
-  @IsInt()
-  @Min(1)
-  @Max(20)
-  hoursPerWeek!: number;
-
-  @ApiProperty({ enum: DayOfWeek, description: 'Thứ trong tuần' })
-  @IsEnum(DayOfWeek)
-  dayOfWeek!: DayOfWeek;
-
-  @ApiProperty({ description: 'Tiết học (VD: "1->3", "13->16")' })
-  @IsString()
-  timeSlot!: string;
 
   @ApiProperty({ description: 'Ngày bắt đầu' })
   @IsDateString()
@@ -87,6 +104,16 @@ export class CreateTimetableDto {
   @IsString()
   lecturerName?: string;
 
+  @ApiProperty({
+    description: 'Chi tiết lịch học',
+    type: [DetailTimeSlotsDto],
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @ValidateNested({ each: true })
+  @Type(() => DetailTimeSlotsDto)
+  detailTimeSlots!: DetailTimeSlotsDto[];
+
   @ApiPropertyOptional({ description: 'Ghi chú' })
   @IsOptional()
   @IsString()
@@ -99,26 +126,6 @@ export class CreateTimetableDto {
   @ApiProperty({ description: 'ID năm học' })
   @IsUUID()
   academicYearId!: string;
-
-  @ApiPropertyOptional({ description: 'ID khoa/bộ môn' })
-  @IsOptional()
-  @IsUUID()
-  facultyDepartmentId?: string;
-
-  @ApiPropertyOptional({ description: 'ID phòng học' })
-  @IsOptional()
-  @IsUUID()
-  classroomId?: string;
-
-  @ApiPropertyOptional({ description: 'ID giảng viên' })
-  @IsOptional()
-  @IsUUID()
-  lecturerId?: string;
-
-  @ApiPropertyOptional({ description: 'Tên phòng học gốc từ file Excel' })
-  @IsOptional()
-  @IsString()
-  roomName?: string;
 }
 
 export class UpdateTimetableDto extends PartialType(CreateTimetableDto) {}
@@ -138,21 +145,6 @@ export class TimetableQueryDto {
   @IsOptional()
   @IsEnum(KyHoc)
   semester?: KyHoc;
-
-  @ApiPropertyOptional({ enum: DayOfWeek, description: 'Thứ trong tuần' })
-  @IsOptional()
-  @IsEnum(DayOfWeek)
-  dayOfWeek?: DayOfWeek;
-
-  @ApiPropertyOptional({ description: 'ID phòng học' })
-  @IsOptional()
-  @IsUUID()
-  classroomId?: string;
-
-  @ApiPropertyOptional({ description: 'ID giảng viên' })
-  @IsOptional()
-  @IsUUID()
-  lecturerId?: string;
 
   @ApiPropertyOptional({ description: 'Ngày bắt đầu tìm kiếm' })
   @IsOptional()
@@ -174,7 +166,7 @@ export class TimetableQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number = 1;
+  page: number = 1;
 
   @ApiPropertyOptional({ description: 'Số bản ghi mỗi trang', default: 20 })
   @IsOptional()
@@ -182,13 +174,18 @@ export class TimetableQueryDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  limit?: number = 20;
+  limit: number = 20;
 }
 
 export class TimetableConflictCheckDto {
-  @ApiProperty({ description: 'ID phòng học' })
-  @IsUUID()
-  classroomId!: string;
+  @ApiProperty({ description: 'Tên phòng học' })
+  @IsString()
+  roomName!: string;
+
+  @ApiPropertyOptional({ description: 'Tên tòa nhà' })
+  @IsOptional()
+  @IsString()
+  buildingName?: string;
 
   @ApiProperty({ enum: DayOfWeek, description: 'Thứ trong tuần' })
   @IsEnum(DayOfWeek)
@@ -246,6 +243,10 @@ export class TimetableUploadDataDto {
   @IsNumber()
   actualHours!: number;
 
+  @ApiProperty({ description: 'Hệ số ngoài giờ' })
+  @IsNumber()
+  overtimeCoefficient!: number;
+
   @ApiProperty({ description: 'Số tiết quy chuẩn' })
   @IsNumber()
   standardHours!: number;
@@ -258,42 +259,24 @@ export class TimetableUploadDataDto {
   @IsString()
   classType!: string;
 
-  @ApiProperty({ description: 'Số tiết/tuần' })
-  @IsInt()
-  hoursPerWeek!: number;
+  @IsArray()
+  @ArrayNotEmpty()
+  detailTimeSlots!: DetailTimeSlotsDto[];
 
-  @ApiProperty({ description: 'Thứ' })
-  @IsInt()
-  @Min(1)
-  @Max(7)
-  dayOfWeek!: number;
-
-  @ApiProperty({ description: 'Tiết học' })
-  @IsString()
-  timeSlot!: string;
-
-  @ApiProperty({ description: 'Phòng học' })
-  @IsString()
-  roomName!: string;
-
-  @ApiProperty({ description: 'Ngày bắt đầu' })
-  @IsString()
+  @ApiProperty({ description: 'Ngày bắt đầu', example: '2025-09-15' })
+  @IsDateString()
   startDate!: string;
 
-  @ApiProperty({ description: 'Ngày kết thúc' })
-  @IsString()
+  @ApiProperty({ description: 'Ngày kết thúc', example: '2025-12-20' })
+  @IsDateString()
   endDate!: string;
+
+  @ApiProperty({ description: 'Giáo viên' })
+  @IsString()
+  lecturerName!: string;
 }
 
 export class TimetableUploadDto {
-  @ApiProperty({ description: 'Kỳ học' })
-  @IsEnum(KyHoc)
-  semester!: KyHoc;
-
-  @ApiProperty({ description: 'ID năm học' })
-  @IsUUID()
-  academicYearId!: string;
-
   @ApiProperty({ description: 'Danh sách dữ liệu thời khóa biểu' })
   @IsArray()
   @ValidateNested({ each: true })
@@ -301,55 +284,73 @@ export class TimetableUploadDto {
   data!: TimetableUploadDataDto[];
 }
 
-export class TimetableResponseDto {
-  @ApiProperty({ description: 'ID' })
-  id!: string;
+// export class CourseResponseDto {
+//   id!: string;
+//   courseCode!: string;
+//   courseName!: string;
+//   credits!: number;
+//   semester!: KyHoc;
+//   description?: string
+// }
 
-  @ApiProperty({ description: 'Tên lớp học phần' })
-  className!: string;
+// export class AcademicYearResponseDto {
+//   id!: string;
+//   yearCode!: string;
+// }
 
-  @ApiProperty({ description: 'Mã lớp học phần' })
-  classCode?: string;
+// // không cần validate trong response
+// export class TimetableResponseDto {
+//   @ApiProperty({ description: 'ID' })
+//   id!: string;
 
-  @ApiProperty({ enum: KyHoc })
-  semester!: KyHoc;
+//   @ApiProperty({ description: 'Tên lớp học phần' })
+//   className!: string;
 
-  @ApiProperty({ description: 'Hình thức học' })
-  classType!: string;
+//   @ApiProperty({ enum: KyHoc, description: 'Kỳ học' })
+//   semester!: KyHoc;
 
-  @ApiProperty({ description: 'Số sinh viên' })
-  studentCount!: number;
+//   @ApiProperty({ description: 'Hình thức học' })
+//   classType!: string;
 
-  @ApiProperty({ description: 'Số tiết/tuần' })
-  hoursPerWeek!: number;
+//   @ApiProperty({ description: 'Số sinh viên' })
+//   studentCount!: number;
 
-  @ApiProperty({ enum: DayOfWeek })
-  dayOfWeek!: DayOfWeek;
+//   @ApiProperty({ description: 'Số tiết lý thuyết' })
+//   theoryHours!: number;
 
-  @ApiProperty({ description: 'Tiết học' })
-  timeSlot!: string;
+//   @ApiProperty({ description: 'Hệ số lớp đông' })
+//   crowdClassCoefficient!: number;
 
-  @ApiProperty({ description: 'Ngày bắt đầu' })
-  startDate!: Date;
+//   @ApiProperty({ description: 'Số tiết thực (tính hệ số)' })
+//   actualHours!: number;
 
-  @ApiProperty({ description: 'Ngày kết thúc' })
-  endDate!: Date;
+//   @ApiProperty({ description: 'Hệ số ngoài giờ' })
+//   overtimeCoefficient!: number;
 
-  @ApiProperty({ description: 'Tên giảng viên' })
-  lecturerName?: string;
+//   @ApiProperty({ description: 'Số tiết quy chuẩn' })
+//   standardHours!: number;
 
-  @ApiProperty({ description: 'Tên phòng học' })
-  roomName?: string;
+//   @ApiProperty({ description: 'Ngày bắt đầu' })
+//   startDate!: string;
 
-  @ApiProperty({ description: 'Thông tin học phần' })
-  course?: any;
+//   @ApiProperty({ description: 'Ngày kết thúc' })
+//   endDate!: string;
 
-  @ApiProperty({ description: 'Thông tin năm học' })
-  academicYear?: any;
+//   @ApiPropertyOptional({ description: 'Tên giảng viên' })
+//   lecturerName?: string;
 
-  @ApiProperty({ description: 'Thông tin phòng học' })
-  classroom?: any;
+//   @ApiProperty({ description: 'Thông tin học phần' })
+//   course!: CourseResponseDto;
 
-  @ApiProperty({ description: 'Thông tin giảng viên' })
-  lecturer?: any;
-}
+//   @ApiProperty({ description: 'Thông tin năm học' })
+//   academicYear!: AcademicYearResponseDto;
+
+//   @ApiProperty({
+//     description: 'Chi tiết lịch học',
+//     type: [DetailTimeSlotsDto],
+//   })
+//   detailTimeSlots!: DetailTimeSlotsDto[];
+
+//   @ApiPropertyOptional({ description: 'Ghi chú' })
+//   notes?: string;
+// }

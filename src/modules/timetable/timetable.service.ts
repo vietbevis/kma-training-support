@@ -8,8 +8,8 @@ import { AcademicYearEntity } from 'src/database/entities/academic-years.entity'
 import { ClassroomEntity } from 'src/database/entities/classrooms.entity';
 import { CourseEntity } from 'src/database/entities/course.entity';
 import { TimetableEntity } from 'src/database/entities/timetable.entity';
-import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
-import { Between, FindOptionsWhere, Like, Repository } from 'typeorm';
+import { KyHoc } from 'src/shared/enums/semester.enum';
+import { Between, DataSource, EntityManager, ILike, Repository } from 'typeorm';
 import {
   CreateTimetableDto,
   TimetableConflictCheckDto,
@@ -30,6 +30,7 @@ export class TimetableService {
     private readonly academicYearRepository: Repository<AcademicYearEntity>,
     @InjectRepository(ClassroomEntity)
     private readonly classroomRepository: Repository<ClassroomEntity>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(
@@ -52,66 +53,97 @@ export class TimetableService {
     }
 
     // Check for conflicts if classroom is provided
-    if (createTimetableDto.classroomId) {
-      await this.checkConflict({
-        classroomId: createTimetableDto.classroomId,
-        dayOfWeek: createTimetableDto.dayOfWeek,
-        timeSlot: createTimetableDto.timeSlot,
-        startDate: createTimetableDto.startDate,
-        endDate: createTimetableDto.endDate,
-      });
+    if (
+      createTimetableDto.detailTimeSlots &&
+      createTimetableDto.detailTimeSlots.length > 0
+    ) {
+      for (const slot of createTimetableDto.detailTimeSlots) {
+        await this.checkConflict({
+          roomName: slot.roomName,
+          buildingName: slot.buildingName || '',
+          dayOfWeek: slot.dayOfWeek,
+          timeSlot: slot.timeSlot,
+          startDate: slot.startDate,
+          endDate: slot.endDate,
+        });
+      }
     }
 
     const timetable = this.timetableRepository.create(createTimetableDto);
     return await this.timetableRepository.save(timetable);
   }
 
+  // Phiên bản create sử dụng EntityManager cho transaction
+  private async createWithManager(
+    createTimetableDto: CreateTimetableDto,
+    manager: EntityManager,
+  ): Promise<TimetableEntity> {
+    // Validate course exists
+    const course = await manager.findOne(CourseEntity, {
+      where: { id: createTimetableDto.courseId },
+    });
+    if (!course) {
+      throw new NotFoundException('Học phần không tồn tại');
+    }
+
+    // Validate academic year exists
+    const academicYear = await manager.findOne(AcademicYearEntity, {
+      where: { id: createTimetableDto.academicYearId },
+    });
+    if (!academicYear) {
+      throw new NotFoundException('Năm học không tồn tại');
+    }
+
+    // Check for conflicts if classroom is provided
+    if (
+      createTimetableDto.detailTimeSlots &&
+      createTimetableDto.detailTimeSlots.length > 0
+    ) {
+      for (const slot of createTimetableDto.detailTimeSlots) {
+        await this.checkConflictWithManager(
+          {
+            roomName: slot.roomName,
+            buildingName: slot.buildingName || '',
+            dayOfWeek: slot.dayOfWeek,
+            timeSlot: slot.timeSlot,
+            startDate: slot.startDate,
+            endDate: slot.endDate,
+          },
+          manager,
+        );
+      }
+    }
+
+    const timetable = manager.create(TimetableEntity, createTimetableDto);
+    return await manager.save(TimetableEntity, timetable);
+  }
+
   async findAll(query: TimetableQueryDto) {
     const { page = 1, limit = 20, ...filters } = query;
     const skip = (page - 1) * limit;
 
-    const where: FindOptionsWhere<TimetableEntity> = {};
-
-    if (filters.courseId) {
-      where.courseId = filters.courseId;
-    }
-    if (filters.academicYearId) {
-      where.academicYearId = filters.academicYearId;
-    }
-    if (filters.semester) {
-      where.semester = filters.semester;
-    }
-    if (filters.dayOfWeek) {
-      where.dayOfWeek = filters.dayOfWeek;
-    }
-    if (filters.classroomId) {
-      where.classroomId = filters.classroomId;
-    }
-    if (filters.lecturerId) {
-      where.lecturerId = filters.lecturerId;
-    }
-    if (filters.className) {
-      where.className = Like(`%${filters.className}%`);
-    }
-    if (filters.startDate && filters.endDate) {
-      where.startDate = Between(
-        new Date(filters.startDate),
-        new Date(filters.endDate),
-      );
-    }
-
     const [data, total] = await this.timetableRepository.findAndCount({
-      where,
-      relations: [
-        'course',
-        'academicYear',
-        'facultyDepartment',
-        'classroom',
-        'lecturer',
-      ],
+      where: {
+        className: filters.className
+          ? ILike(`%${filters.className}%`)
+          : undefined,
+        courseId: filters.courseId || undefined,
+        academicYearId: filters.academicYearId || undefined,
+        semester: filters.semester || undefined,
+        startDate:
+          filters.startDate && filters.endDate
+            ? Between(new Date(filters.startDate), new Date(filters.endDate))
+            : undefined,
+      },
+      relations: {
+        course: true,
+        academicYear: true,
+      },
       skip,
       take: limit,
-      order: { dayOfWeek: 'ASC', timeSlot: 'ASC' },
+      order: {
+        createdAt: 'DESC',
+      },
     });
 
     return {
@@ -128,13 +160,10 @@ export class TimetableService {
   async findOne(id: string): Promise<TimetableEntity> {
     const timetable = await this.timetableRepository.findOne({
       where: { id },
-      relations: [
-        'course',
-        'academicYear',
-        'facultyDepartment',
-        'classroom',
-        'lecturer',
-      ],
+      relations: {
+        course: true,
+        academicYear: true,
+      },
     });
 
     if (!timetable) {
@@ -150,59 +179,66 @@ export class TimetableService {
   ): Promise<TimetableEntity> {
     const timetable = await this.findOne(id);
 
-    // Check for conflicts if relevant fields are being updated
-    if (
-      updateTimetableDto.classroomId ||
-      updateTimetableDto.dayOfWeek ||
-      updateTimetableDto.timeSlot ||
-      updateTimetableDto.startDate ||
-      updateTimetableDto.endDate
-    ) {
-      await this.checkConflict({
-        classroomId: updateTimetableDto.classroomId || timetable.classroomId!,
-        dayOfWeek: updateTimetableDto.dayOfWeek || timetable.dayOfWeek,
-        timeSlot: updateTimetableDto.timeSlot || timetable.timeSlot,
-        startDate:
-          updateTimetableDto.startDate || timetable.startDate.toISOString(),
-        endDate: updateTimetableDto.endDate || timetable.endDate.toISOString(),
-        excludeId: id,
-      });
+    // Nếu có detailTimeSlots mới thì check conflict
+    if (updateTimetableDto.detailTimeSlots?.length) {
+      for (const slot of updateTimetableDto.detailTimeSlots) {
+        await this.checkConflict({
+          roomName: slot.roomName,
+          buildingName: slot.buildingName || '',
+          dayOfWeek: slot.dayOfWeek,
+          timeSlot: slot.timeSlot,
+          startDate: slot.startDate,
+          endDate: slot.endDate,
+          excludeId: id,
+        });
+      }
     }
 
+    // Merge dữ liệu mới vào entity cũ
     Object.assign(timetable, updateTimetableDto);
+
     return await this.timetableRepository.save(timetable);
   }
 
   async remove(id: string): Promise<void> {
-    const timetable = await this.findOne(id);
-    await this.timetableRepository.remove(timetable);
+    try {
+      const timetable = await this.findOne(id);
+      await this.timetableRepository.remove(timetable);
+    } catch (error) {
+      throw new NotFoundException('Không tìm thấy thời khóa biểu');
+    }
   }
 
   async checkConflict(conflictDto: TimetableConflictCheckDto): Promise<void> {
-    const where: FindOptionsWhere<TimetableEntity> = {
-      classroomId: conflictDto.classroomId,
-      dayOfWeek: conflictDto.dayOfWeek,
-      timeSlot: conflictDto.timeSlot,
-    };
-
-    // Check for date overlap
-    const startDate = new Date(conflictDto.startDate);
-    const endDate = new Date(conflictDto.endDate);
+    // Chỉ check nếu roomName bắt đầu bằng số
+    const isRealRoom = /^[0-9]/.test(conflictDto.roomName);
+    if (!isRealRoom) {
+      return;
+    }
 
     const conflictingSchedules = await this.timetableRepository
       .createQueryBuilder('timetable')
-      .where('timetable.classroomId = :classroomId', {
-        classroomId: conflictDto.classroomId,
-      })
-      .andWhere('timetable.dayOfWeek = :dayOfWeek', {
-        dayOfWeek: conflictDto.dayOfWeek,
-      })
-      .andWhere('timetable.timeSlot = :timeSlot', {
-        timeSlot: conflictDto.timeSlot,
-      })
-      .andWhere(
-        '(timetable.startDate <= :endDate AND timetable.endDate >= :startDate)',
-        { startDate, endDate },
+      .where(
+        `
+      EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(timetable.detail_time_slots) as slot
+        WHERE slot->>'roomName' = :roomName
+          AND slot->>'buildingName' = :buildingName
+          AND (slot->>'dayOfWeek')::int = :dayOfWeek
+          AND slot->>'timeSlot' = :timeSlot
+          AND (slot->>'startDate')::date <= :endDate
+          AND (slot->>'endDate')::date >= :startDate
+      )
+    `,
+        {
+          roomName: conflictDto.roomName,
+          buildingName: conflictDto.buildingName,
+          dayOfWeek: conflictDto.dayOfWeek,
+          timeSlot: conflictDto.timeSlot,
+          startDate: conflictDto.startDate,
+          endDate: conflictDto.endDate,
+        },
       )
       .andWhere(conflictDto.excludeId ? 'timetable.id != :excludeId' : '1=1', {
         excludeId: conflictDto.excludeId,
@@ -216,39 +252,55 @@ export class TimetableService {
     }
   }
 
-  // Lấy thời khóa biểu theo tuần
-  async getWeeklySchedule(
-    academicYearId: string,
-    semester: string,
-    week: Date,
-  ): Promise<any> {
-    // Calculate start and end of week
-    const startOfWeek = new Date(week);
-    startOfWeek.setDate(week.getDate() - week.getDay() + 1); // Monday
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(startOfWeek.getDate() + 6); // Sunday
-
-    const schedules = await this.timetableRepository.find({
-      where: {
-        academicYearId,
-        semester: semester as any,
-        startDate: Between(startOfWeek, endOfWeek),
-      },
-      relations: ['course', 'classroom', 'lecturer'],
-      order: { dayOfWeek: 'ASC', timeSlot: 'ASC' },
-    });
-
-    // Group by day of week
-    const weeklySchedule: any = {};
-    for (let day = 2; day <= 7; day++) {
-      // Monday to Saturday
-      weeklySchedule[day] = schedules.filter((s) => s.dayOfWeek === day);
+  // Phiên bản checkConflict sử dụng EntityManager cho transaction
+  private async checkConflictWithManager(
+    conflictDto: TimetableConflictCheckDto,
+    manager: EntityManager,
+  ): Promise<void> {
+    // Chỉ check nếu roomName bắt đầu bằng số
+    const isRealRoom = /^[0-9]/.test(conflictDto.roomName);
+    if (!isRealRoom) {
+      return;
     }
 
-    return weeklySchedule;
+    const conflictingSchedules = await manager
+      .createQueryBuilder(TimetableEntity, 'timetable')
+      .where(
+        `
+      EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(timetable.detail_time_slots) as slot
+        WHERE slot->>'roomName' = :roomName
+          AND slot->>'buildingName' = :buildingName
+          AND (slot->>'dayOfWeek')::int = :dayOfWeek
+          AND slot->>'timeSlot' = :timeSlot
+          AND (slot->>'startDate')::date <= :endDate
+          AND (slot->>'endDate')::date >= :startDate
+      )
+    `,
+        {
+          roomName: conflictDto.roomName,
+          buildingName: conflictDto.buildingName,
+          dayOfWeek: conflictDto.dayOfWeek,
+          timeSlot: conflictDto.timeSlot,
+          startDate: conflictDto.startDate,
+          endDate: conflictDto.endDate,
+        },
+      )
+      .andWhere(conflictDto.excludeId ? 'timetable.id != :excludeId' : '1=1', {
+        excludeId: conflictDto.excludeId,
+      })
+      .getMany();
+
+    if (conflictingSchedules.length > 0) {
+      throw new ConflictException(
+        'Phòng học đã có lịch trùng với thời gian này',
+      );
+    }
   }
 
   // Upload thời khóa biểu từ Excel
+  // Duyệt qua tất cả các dòng dl được parse, xử lý từng dòng và ghi nhận kết quả
   async uploadFromExcel(uploadDto: TimetableUploadDto): Promise<{
     success: number;
     errors: Array<{ row: number; data: TimetableUploadDataDto; error: string }>;
@@ -262,94 +314,158 @@ export class TimetableService {
       }>;
     } = { success: 0, errors: [] };
 
-    for (const [index, item] of uploadDto.data.entries()) {
-      try {
-        await this.processExcelRow(
-          item,
-          uploadDto.semester,
-          uploadDto.academicYearId,
-        );
-        results.success++;
-      } catch (error: any) {
-        results.errors.push({
-          row: index + 1,
-          data: item,
-          error: error.message,
-        });
+    // Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu
+    await this.dataSource.transaction(async (manager) => {
+      for (const [index, item] of uploadDto.data.entries()) {
+        try {
+          // xử lý và lưu vào DB với transaction manager
+          await this.processExcelRow(item, manager);
+          // nếu thành công -> tăng success
+          results.success++;
+        } catch (error: any) {
+          // lỗi -> ghi nhận row, data và error.message vào results.errors
+          results.errors.push({
+            row: index + 1,
+            data: item,
+            error: error.message,
+          });
+        }
       }
-    }
+    });
 
     return results;
   }
 
+  // Xử lý 1 dòng dữ liệu Excel, ánh xạ sang CreateTimeTableDto rồi gọi hàm create để lưu vào DB
   private async processExcelRow(
     data: TimetableUploadDataDto,
-    semester: any,
-    academicYearId: string,
+    manager: EntityManager,
   ): Promise<void> {
+    const semester = getSemester(data.startDate, data.endDate);
+
     // Find course by code
-    const course = await this.courseRepository.findOne({
-      where: { courseCode: data.courseCode },
-    });
-    if (!course) {
-      throw new Error(`Không tìm thấy học phần với mã: ${data.courseCode}`);
-    }
+    // 1. Tìm học phần (course) theo courseCode
+    const course = await this.getOrCreateCourse(data, semester, manager);
+
+    // 2. Tìm hoặc tạo Academic Year nếu chưa có
+    const academicYearId = await this.getOrCreateAcademicYear(data, manager);
 
     // Map class type
+    // Xác định loại lớp
     const classType = data.classType.toUpperCase();
 
-    // Find classroom by name (if not LMS or online)
-    let classroomId: string | undefined;
-    if (data.roomName !== 'LMS' && data.roomName.trim() !== '') {
-      const classroom = await this.classroomRepository.findOne({
-        where: { name: Like(`%${data.roomName}%`) },
-      });
-      classroomId = classroom?.id;
-    }
-
-    // Parse dates
-    const startDate = this.parseExcelDate(data.startDate);
-    const endDate = this.parseExcelDate(data.endDate);
-
+    // tạo DTO
     const createDto: CreateTimetableDto = {
       className: data.className,
-      semester,
       classType,
+      semester,
       studentCount: data.studentCount,
       theoryHours: data.theoryHours,
       crowdClassCoefficient: data.crowdClassCoefficient,
       actualHours: data.actualHours,
+      overtimeCoefficient: data.overtimeCoefficient,
       standardHours: data.standardHours,
-      hoursPerWeek: data.hoursPerWeek,
-      dayOfWeek: data.dayOfWeek as DayOfWeek,
-      timeSlot: data.timeSlot,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
+      lecturerName: data.lecturerName,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      detailTimeSlots: data.detailTimeSlots,
       courseId: course.id,
       academicYearId,
-      classroomId,
-      roomName: data.roomName,
     };
 
-    await this.create(createDto);
+    await this.createWithManager(createDto, manager);
   }
 
-  private parseExcelDate(dateStr: string): Date {
-    // Parse date from Excel format (DD/MM/YY)
-    const parts = dateStr.split('/');
-    if (parts.length !== 3) {
-      throw new Error(`Invalid date format: ${dateStr}`);
+  private extractSchoolYear(className: string, startDate: string): string {
+    // Bỏ phần (D601)
+    const cleaned = className.replace(/\s*\([^)]*\)\s*$/, '');
+
+    // Lấy số cuối cùng sau khi bỏ ngoặc
+    const match = cleaned.match(/(\d+)(?!.*\d)/);
+    if (!match) {
+      const year = new Date(startDate).getFullYear();
+      return `${year}-${year + 1}`;
     }
 
-    const day = parseInt(parts[0]);
-    const month = parseInt(parts[1]) - 1; // Month is 0-indexed
-    let year = parseInt(parts[2]);
+    const number = parseInt(match[1], 10); // 25
+    const startYear = number < 100 ? 2000 + number : number; // 2025
+    const endYear = startYear + 1; // 2026
 
-    // Handle 2-digit year
-    if (year < 100) {
-      year += 2000;
+    return `${startYear}-${endYear}`;
+  }
+
+  private async getOrCreateCourse(
+    data: TimetableUploadDataDto,
+    semester: KyHoc,
+    manager: EntityManager,
+  ): Promise<CourseEntity> {
+    let course = await manager.findOne(CourseEntity, {
+      where: { courseCode: data.courseCode },
+    });
+
+    if (!course) {
+      try {
+        course = manager.create(CourseEntity, {
+          courseCode: data.courseCode,
+          courseName: data.className.replace(/\s*\([^)]*\)\s*$/, ''),
+          credits: data.credits,
+          semester,
+        });
+        course = await manager.save(CourseEntity, course);
+      } catch (error) {
+        console.error(`Error creating course ${data.courseCode}:`, error);
+        throw error; // hoặc return để không chạy tiếp
+      }
     }
+    return course;
+  }
 
-    return new Date(year, month, day);
+  private async getOrCreateAcademicYear(
+    data: TimetableUploadDataDto,
+    manager: EntityManager,
+  ): Promise<string> {
+    const extractedYear = this.extractSchoolYear(
+      data.className,
+      data.startDate,
+    );
+
+    let year = await manager.findOne(AcademicYearEntity, {
+      where: { yearCode: extractedYear },
+    });
+    if (!year) {
+      year = manager.create(AcademicYearEntity, { yearCode: extractedYear });
+      year = await manager.save(AcademicYearEntity, year);
+    }
+    return year.id;
+  }
+}
+
+function getSemester(startDateStr: string, endDateStr: string): KyHoc {
+  const startMonth = new Date(startDateStr).getMonth() + 1; // 1–12
+  const endMonth = new Date(endDateStr).getMonth() + 1;
+
+  switch (true) {
+    case startMonth >= 8 && endMonth <= 10:
+      return KyHoc.KI_1_1;
+
+    case startMonth >= 10 && endMonth <= 12:
+      return KyHoc.KI_1_2;
+
+    case startMonth >= 1 && endMonth <= 4:
+      return KyHoc.KI_2_1;
+
+    case startMonth >= 4 && endMonth <= 7:
+      return KyHoc.KI_2_2;
+
+    // fallback
+    case startMonth >= 8 && endMonth <= 12:
+      return KyHoc.KI_1_2;
+
+    case startMonth >= 1 && endMonth <= 7:
+      return KyHoc.KI_2_2;
+
+    default:
+      // Nếu không rơi vào khoảng nào (ví dụ tháng 1), mặc định cho về "Kỳ 2 đợt 2"
+      return KyHoc.KI_2_2;
   }
 }

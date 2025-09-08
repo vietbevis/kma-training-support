@@ -17,6 +17,7 @@ import { ClassroomEntity } from './classrooms.entity';
 import { CourseEntity } from './course.entity';
 import { FacultyDepartmentEntity } from './faculty-department.entity';
 import { UserEntity } from './user.entity';
+import { DetailTimeSlot } from '../interface/detail-time-slot.interface';
 
 @Entity('tbl_timetables')
 export class TimetableEntity extends AuditableEntity {
@@ -29,14 +30,6 @@ export class TimetableEntity extends AuditableEntity {
   })
   className!: string;
 
-  @Column({
-    name: 'class_code',
-    type: 'varchar',
-    length: 100,
-    nullable: true,
-    comment: 'Mã lớp học phần (VD: A1801)',
-  })
-  classCode?: string;
 
   @Column({
     type: 'enum',
@@ -91,6 +84,18 @@ export class TimetableEntity extends AuditableEntity {
   })
   actualHours!: number;
 
+
+  @Column({
+    name: 'overtime_coefficient',
+    type: 'decimal',
+    precision: 3,
+    scale: 2,
+    default: 0,
+    comment: 'Hệ số ngoài giờ',
+  })
+  overtimeCoefficient!: number;
+  
+
   @Column({
     name: 'standard_hours',
     type: 'decimal',
@@ -100,32 +105,6 @@ export class TimetableEntity extends AuditableEntity {
     comment: 'Số tiết quy chuẩn',
   })
   standardHours!: number;
-
-  @Column({
-    name: 'hours_per_week',
-    type: 'int',
-    comment: 'Số tiết/tuần',
-  })
-  @IsInt()
-  @Min(1)
-  @Max(20)
-  hoursPerWeek!: number;
-
-  @Column({
-    name: 'day_of_week',
-    type: 'enum',
-    enum: DayOfWeek,
-    comment: 'Thứ trong tuần (2,3,4,5,6,7,1)',
-  })
-  dayOfWeek!: DayOfWeek;
-
-  @Column({
-    name: 'time_slot',
-    type: 'varchar',
-    length: 50,
-    comment: 'Tiết học (VD: "1->3", "13->16")',
-  })
-  timeSlot!: string;
 
   @Column({
     name: 'start_date',
@@ -153,6 +132,14 @@ export class TimetableEntity extends AuditableEntity {
   @IsOptional()
   @IsString()
   lecturerName?: string;
+
+  @Column({
+    type: 'jsonb',
+    name: 'detail_time_slots',
+    nullable: false,
+    comment: 'Chi tiết lịch học (mảng các slot)',
+  })
+  detailTimeSlots!: DetailTimeSlot[];
 
   @Column({
     name: 'notes',
@@ -190,55 +177,4 @@ export class TimetableEntity extends AuditableEntity {
   @ManyToOne(() => AcademicYearEntity, { eager: true })
   @JoinColumn({ name: 'academic_year_id' })
   academicYear!: AcademicYearEntity;
-
-  @Exclude()
-  @ApiHideProperty()
-  @Column({
-    name: 'faculty_department_id',
-    nullable: true,
-    comment: 'ID khoa/bộ môn',
-  })
-  facultyDepartmentId?: string;
-
-  @Type(() => FacultyDepartmentEntity)
-  @ManyToOne(() => FacultyDepartmentEntity, { nullable: true })
-  @JoinColumn({ name: 'faculty_department_id' })
-  facultyDepartment?: FacultyDepartmentEntity;
-
-  @Exclude()
-  @ApiHideProperty()
-  @Column({
-    name: 'classroom_id',
-    nullable: true,
-    comment: 'ID phòng học',
-  })
-  classroomId?: string;
-
-  @Type(() => ClassroomEntity)
-  @ManyToOne(() => ClassroomEntity, { nullable: true })
-  @JoinColumn({ name: 'classroom_id' })
-  classroom?: ClassroomEntity;
-
-  @Exclude()
-  @ApiHideProperty()
-  @Column({
-    name: 'lecturer_id',
-    nullable: true,
-    comment: 'ID giảng viên',
-  })
-  lecturerId?: string;
-
-  @Type(() => UserEntity)
-  @ManyToOne(() => UserEntity, { nullable: true })
-  @JoinColumn({ name: 'lecturer_id' })
-  lecturer?: UserEntity;
-
-  @Column({
-    name: 'room_name',
-    type: 'varchar',
-    length: 100,
-    nullable: true,
-    comment: 'Tên phòng học gốc từ file Excel (VD: "503-TA1", "LMS")',
-  })
-  roomName?: string;
 }

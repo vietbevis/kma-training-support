@@ -281,6 +281,7 @@ export const RELATION_SPECIAL_FIELDS = new Set([
 export const EXCLUDED_ENTITIES = new Set([
   'AuditLogEntity', // Tránh audit chính audit log gây lặp vô hạn
   'RefreshTokenEntity', // Token thay đổi quá nhiều
+  'TimetableEntity', // Thời khóa biểu thay đổi quá nhiều
 ]);
 
 // Danh sách fields nhạy cảm cần ẩn
@@ -898,7 +899,7 @@ export class AuditLogSubscriber
     }
 
     // Nếu là chuỗi và có thể chuyển thành số
-    if (_.isString(value) && this.isNumericString(value)) {
+    if (_.isString(value) && this.isNumericString(value as string)) {
       const numValue = parseFloat(value as string);
       return numValue as T;
     }
