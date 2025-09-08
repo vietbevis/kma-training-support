@@ -23,7 +23,6 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { TimetableEntity } from 'src/database/entities/timetable.entity';
-import { Public } from 'src/shared/decorators/public.decorator';
 import { ExcelFileValidator } from './excel-file.validator';
 import { ExcelParserService } from './excel-parser.service';
 import {
@@ -37,7 +36,6 @@ import { TimetableService } from './timetable.service';
 
 @ApiTags('Timetable - Thời khóa biểu')
 @Controller('timetables')
-@Public()
 export class TimetableController {
   constructor(
     private readonly timetableService: TimetableService,
