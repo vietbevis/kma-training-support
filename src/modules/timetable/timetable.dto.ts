@@ -17,13 +17,11 @@ import {
 import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
 import { KyHoc } from 'src/shared/enums/semester.enum';
 
-
 export class DetailTimeSlotsDto {
   @ApiProperty({
-    description: "Thứ",
+    description: 'Thứ',
     enum: DayOfWeek,
   })
-
   @IsEnum(DayOfWeek)
   dayOfWeek!: DayOfWeek;
 
@@ -35,13 +33,10 @@ export class DetailTimeSlotsDto {
   @IsString()
   roomName!: string;
 
-
   @ApiPropertyOptional({ description: 'Tòa nhà' })
   @IsOptional()
   @IsString()
   buildingName?: string;
-
-
 
   @ApiProperty({ description: 'Ngày bắt đầu', example: '2025-09-15' })
   @IsDateString()
@@ -52,7 +47,6 @@ export class DetailTimeSlotsDto {
   endDate!: string;
 }
 
-
 export class CreateTimetableDto {
   @ApiProperty({ description: 'Tên lớp học phần cụ thể' })
   @IsString()
@@ -61,7 +55,6 @@ export class CreateTimetableDto {
   @ApiProperty({ enum: KyHoc, description: 'Kỳ học' })
   @IsEnum(KyHoc)
   semester!: KyHoc;
-
 
   @ApiProperty({ description: 'Hình thức học' })
   @IsString()
@@ -88,19 +81,15 @@ export class CreateTimetableDto {
   @Min(0)
   actualHours!: number;
 
-
   @ApiProperty({ description: 'Hệ số ngoài giờ' })
   @IsNumber()
   @Min(0)
   overtimeCoefficient!: number;
 
-
-
   @ApiProperty({ description: 'Số tiết quy chuẩn' })
   @IsNumber()
   @Min(0)
   standardHours!: number;
-
 
   @ApiProperty({ description: 'Ngày bắt đầu' })
   @IsDateString()
@@ -137,7 +126,6 @@ export class CreateTimetableDto {
   @ApiProperty({ description: 'ID năm học' })
   @IsUUID()
   academicYearId!: string;
-
 }
 
 export class UpdateTimetableDto extends PartialType(CreateTimetableDto) {}
@@ -189,9 +177,7 @@ export class TimetableQueryDto {
   limit: number = 20;
 }
 
-
 export class TimetableConflictCheckDto {
-
   @ApiProperty({ description: 'Tên phòng học' })
   @IsString()
   roomName!: string;
@@ -222,7 +208,6 @@ export class TimetableConflictCheckDto {
   @IsUUID()
   excludeId?: string;
 }
-
 
 // DTO cho upload Excel
 export class TimetableUploadDataDto {
@@ -258,11 +243,9 @@ export class TimetableUploadDataDto {
   @IsNumber()
   actualHours!: number;
 
-
   @ApiProperty({ description: 'Hệ số ngoài giờ' })
   @IsNumber()
   overtimeCoefficient!: number;
-
 
   @ApiProperty({ description: 'Số tiết quy chuẩn' })
   @IsNumber()
@@ -278,8 +261,7 @@ export class TimetableUploadDataDto {
 
   @IsArray()
   @ArrayNotEmpty()
-  detailTimeSlots!: DetailTimeSlotsDto[]
-
+  detailTimeSlots!: DetailTimeSlotsDto[];
 
   @ApiProperty({ description: 'Ngày bắt đầu', example: '2025-09-15' })
   @IsDateString()
@@ -292,18 +274,15 @@ export class TimetableUploadDataDto {
   @ApiProperty({ description: 'Giáo viên' })
   @IsString()
   lecturerName!: string;
-
 }
 
 export class TimetableUploadDto {
-
   @ApiProperty({ description: 'Danh sách dữ liệu thời khóa biểu' })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => TimetableUploadDataDto)
   data!: TimetableUploadDataDto[];
 }
-
 
 // export class CourseResponseDto {
 //   id!: string;

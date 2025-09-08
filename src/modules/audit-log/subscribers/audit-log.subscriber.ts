@@ -281,6 +281,7 @@ export const RELATION_SPECIAL_FIELDS = new Set([
 export const EXCLUDED_ENTITIES = new Set([
   'AuditLogEntity', // Tránh audit chính audit log gây lặp vô hạn
   'RefreshTokenEntity', // Token thay đổi quá nhiều
+  'TimetableEntity', // Thời khóa biểu thay đổi quá nhiều
 ]);
 
 // Danh sách fields nhạy cảm cần ẩn

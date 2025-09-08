@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
 import * as XLSX from 'xlsx';
 import { TimetableUploadDataDto } from './timetable.dto';
-import { DetailTimeSlotsDto } from './timetable.dto';
-import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
 @Injectable()
 export class ExcelParserService {
   async parseExcelFile(fileBuffer: Buffer): Promise<TimetableUploadDataDto[]> {
