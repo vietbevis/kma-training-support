@@ -11,7 +11,14 @@ import { CourseEntity } from 'src/database/entities/course.entity';
 import { TimeSlotEntity } from 'src/database/entities/timeslot.entity';
 import { TimetableEntity } from 'src/database/entities/timetable.entity';
 import { KyHoc } from 'src/shared/enums/semester.enum';
-import { Between, DataSource, EntityManager, ILike, Repository } from 'typeorm';
+import {
+  Between,
+  DataSource,
+  EntityManager,
+  ILike,
+  In,
+  Repository,
+} from 'typeorm';
 import {
   CreateTimetableDto,
   TimetableConflictCheckDto,
@@ -39,127 +46,195 @@ export class TimetableService {
     private readonly dataSource: DataSource,
   ) {}
 
-  // Phiên bản create sử dụng EntityManager cho transaction
   private async createWithManager(
     createTimetableDto: CreateTimetableDto,
     manager: EntityManager,
   ): Promise<TimetableEntity> {
-    // Check for conflicts if classroom is provided
-    if (
-      createTimetableDto.detailTimeSlots &&
-      createTimetableDto.detailTimeSlots.length > 0
-    ) {
-      for (const slot of createTimetableDto.detailTimeSlots) {
-        await this.checkConflictWithManager(
-          {
-            roomName: slot.roomName,
-            buildingName: slot.buildingName || '',
-            dayOfWeek: slot.dayOfWeek,
-            timeSlot: slot.timeSlot,
-            startDate: slot.startDate,
-            endDate: slot.endDate,
-          },
-          manager,
+    const { detailTimeSlots = [], ...timetableData } = createTimetableDto;
+
+    // Batch check conflicts for real rooms only
+    const realRoomSlots = detailTimeSlots.filter((slot) =>
+      /^[0-9]/.test(slot.roomName),
+    );
+
+    if (realRoomSlots.length > 0) {
+      // Build a single query to check all conflicts at once
+      const conflictConditions = realRoomSlots.map((slot) => ({
+        roomName: slot.roomName,
+        buildingName: slot.buildingName || 'Chung',
+        dayOfWeek: slot.dayOfWeek,
+        timeSlot: slot.timeSlot,
+        startDate: slot.startDate,
+        endDate: slot.endDate,
+      }));
+
+      const conflicts = await this.batchCheckConflicts(
+        conflictConditions,
+        manager,
+      );
+      if (conflicts.length > 0) {
+        throw new ConflictException(
+          'Phòng học đã có lịch trùng với thời gian này',
         );
       }
     }
 
-    // Tạo timetable entity (không có detailTimeSlots)
-    const { detailTimeSlots, ...timetableData } = createTimetableDto;
+    // Save timetable first
     const timetable = manager.create(TimetableEntity, timetableData);
     const savedTimetable = await manager.save(TimetableEntity, timetable);
 
-    const buildingMap = new Map<string, BuildingEntity>();
+    if (detailTimeSlots.length === 0) {
+      return savedTimetable;
+    }
 
-    // Kiểm tra classroom và building có tồn tại không nếu không thì tạo mới
+    // Prepare unique building and classroom names
+    const buildingClassroomMap = new Map<string, Set<string>>();
+
     for (const slot of detailTimeSlots) {
-      if (
-        slot.roomName.trim() !== '' &&
-        slot.buildingName &&
-        slot.buildingName.trim() !== ''
-      ) {
-        let building = await manager.findOne(BuildingEntity, {
-          where: { name: slot.buildingName.trim() },
-          relations: { classrooms: true },
-        });
-        if (!building) {
-          building = manager.create(BuildingEntity, {
-            name: slot.buildingName.trim(),
-          });
-          building = await manager.save(BuildingEntity, building);
-        }
+      const buildingName =
+        slot.buildingName && slot.buildingName.trim() !== ''
+          ? slot.buildingName.trim()
+          : 'Chung';
+      const roomName = slot.roomName.trim();
 
-        if (
-          !(building.classrooms || []).some(
-            (c) => c.name === slot.roomName.trim(),
-          )
-        ) {
-          const classroom = manager.create(ClassroomEntity, {
-            name: slot.roomName.trim(),
-            type: 'Phòng học',
-            buildingId: building.id,
-          });
-          await manager.save(ClassroomEntity, classroom);
-          if (building.classrooms && building.classrooms.length > 0) {
-            building.classrooms.push(classroom);
-          } else {
-            building.classrooms = [classroom];
-          }
-        }
-        buildingMap.set(building.name, building);
-      } else {
-        let building = await manager.findOne(BuildingEntity, {
-          where: { name: 'Chung' },
-          relations: { classrooms: true },
-        });
-        if (!building) {
-          building = manager.create(BuildingEntity, {
-            name: 'Chung',
-          });
-          building = await manager.save(BuildingEntity, building);
-        }
+      if (!buildingClassroomMap.has(buildingName)) {
+        buildingClassroomMap.set(buildingName, new Set());
+      }
+      buildingClassroomMap.get(buildingName)!.add(roomName);
+    }
 
-        if (
-          !(building.classrooms || []).some(
-            (c) => c.name === slot.roomName.trim(),
-          )
-        ) {
+    // Batch load all needed buildings with classrooms
+    const buildingNames = Array.from(buildingClassroomMap.keys());
+    const existingBuildings = await manager.find(BuildingEntity, {
+      where: { name: In(buildingNames) },
+      relations: { classrooms: true },
+    });
+
+    const buildingMap = new Map<string, BuildingEntity>();
+    existingBuildings.forEach((b) => buildingMap.set(b.name, b));
+
+    // Prepare buildings and classrooms to insert
+    const buildingsToInsert: BuildingEntity[] = [];
+    const classroomsToInsert: ClassroomEntity[] = [];
+
+    for (const [buildingName, roomNames] of buildingClassroomMap) {
+      let building = buildingMap.get(buildingName);
+
+      if (!building) {
+        building = manager.create(BuildingEntity, { name: buildingName });
+        buildingsToInsert.push(building);
+        building.classrooms = [];
+      }
+
+      const existingRoomNames = new Set(
+        (building.classrooms || []).map((c) => c.name),
+      );
+
+      for (const roomName of roomNames) {
+        if (!existingRoomNames.has(roomName)) {
           const classroom = manager.create(ClassroomEntity, {
-            name: slot.roomName.trim(),
-            type: slot.roomName.trim(),
-            buildingId: building.id,
+            name: roomName,
+            type: buildingName === 'Chung' ? roomName : 'Phòng học',
+            building: building,
           });
-          await manager.save(ClassroomEntity, classroom);
-          if (building.classrooms && building.classrooms.length > 0) {
-            building.classrooms.push(classroom);
-          } else {
-            building.classrooms = [classroom];
+          classroomsToInsert.push(classroom);
+
+          if (!building.classrooms) {
+            building.classrooms = [];
           }
+          building.classrooms.push(classroom);
         }
-        buildingMap.set(building.name, building);
+      }
+
+      buildingMap.set(buildingName, building);
+    }
+
+    // Batch insert new buildings and classrooms
+    if (buildingsToInsert.length > 0) {
+      const savedBuildings = await manager.save(
+        BuildingEntity,
+        buildingsToInsert,
+      );
+      savedBuildings.forEach((b) => buildingMap.set(b.name, b));
+    }
+
+    if (classroomsToInsert.length > 0) {
+      await manager.save(ClassroomEntity, classroomsToInsert);
+    }
+
+    // Create classroom lookup map for quick access
+    const classroomLookup = new Map<string, string>();
+    for (const building of buildingMap.values()) {
+      for (const classroom of building.classrooms || []) {
+        const key = `${building.name}:${classroom.name}`;
+        classroomLookup.set(key, classroom.id);
       }
     }
 
-    // Tạo các timeslot entities riêng biệt
-    if (detailTimeSlots && detailTimeSlots.length > 0) {
-      const timeSlotEntities = detailTimeSlots.map((slot) => {
-        return manager.create(TimeSlotEntity, {
-          dayOfWeek: slot.dayOfWeek,
-          timeSlot: slot.timeSlot,
-          classroomId: buildingMap
-            .get(slot.buildingName || 'Chung')
-            ?.classrooms.find((c) => c.name === slot.roomName)?.id,
-          startDate: new Date(slot.startDate),
-          endDate: new Date(slot.endDate),
-          timetableId: savedTimetable.id,
-        });
-      });
+    // Batch create all timeslots
+    const timeSlotEntities = detailTimeSlots.map((slot) => {
+      const buildingName =
+        slot.buildingName && slot.buildingName.trim() !== ''
+          ? slot.buildingName.trim()
+          : 'Chung';
+      const classroomKey = `${buildingName}:${slot.roomName}`;
 
-      await manager.save(TimeSlotEntity, timeSlotEntities);
-      savedTimetable.timeSlots = timeSlotEntities;
-    }
+      return manager.create(TimeSlotEntity, {
+        dayOfWeek: slot.dayOfWeek,
+        timeSlot: slot.timeSlot,
+        classroomId: classroomLookup.get(classroomKey),
+        startDate: new Date(slot.startDate),
+        endDate: new Date(slot.endDate),
+        timetableId: savedTimetable.id,
+      });
+    });
+
+    // Batch insert all timeslots
+    const savedTimeSlots = await manager.save(TimeSlotEntity, timeSlotEntities);
+    savedTimetable.timeSlots = savedTimeSlots;
 
     return savedTimetable;
+  }
+
+  private async batchCheckConflicts(
+    conflictChecks: TimetableConflictCheckDto[],
+    manager: EntityManager,
+  ): Promise<TimeSlotEntity[]> {
+    if (conflictChecks.length === 0) return [];
+
+    // Build a complex OR condition for all conflict checks
+    const queryBuilder = manager
+      .createQueryBuilder(TimeSlotEntity, 'timeSlot')
+      .innerJoin('timeSlot.classroom', 'classroom')
+      .innerJoin('classroom.building', 'building');
+
+    const whereConditions: string[] = [];
+    const parameters: any = {};
+
+    conflictChecks.forEach((check, index) => {
+      const condition = `(
+        classroom.name = :roomName${index} AND
+        building.name = :buildingName${index} AND
+        timeSlot.dayOfWeek = :dayOfWeek${index} AND
+        timeSlot.timeSlot = :timeSlot${index} AND
+        timeSlot.startDate <= :endDate${index} AND
+        timeSlot.endDate >= :startDate${index}
+      )`;
+
+      whereConditions.push(condition);
+      parameters[`roomName${index}`] = check.roomName;
+      parameters[`buildingName${index}`] = check.buildingName;
+      parameters[`dayOfWeek${index}`] = check.dayOfWeek;
+      parameters[`timeSlot${index}`] = check.timeSlot;
+      parameters[`startDate${index}`] = check.startDate;
+      parameters[`endDate${index}`] = check.endDate;
+    });
+
+    if (whereConditions.length > 0) {
+      queryBuilder.where(`(${whereConditions.join(' OR ')})`, parameters);
+    }
+
+    return await queryBuilder.getMany();
   }
 
   async create(
@@ -232,178 +307,217 @@ export class TimetableService {
     updateTimetableDto: UpdateTimetableDto,
   ): Promise<TimetableEntity> {
     const timetable = await this.findOne(id);
-    const { courseId, academicYearId, ...rest } = updateTimetableDto;
+    const { courseId, academicYearId, actualHours, studentCount, ...rest } =
+      updateTimetableDto;
 
-    if (
-      updateTimetableDto.studentCount &&
-      updateTimetableDto.studentCount !== timetable.studentCount
-    ) {
-      // lấy số sinh viên mới và map về HSLĐ tương ứng
-      timetable.crowdClassCoefficient = this.updateCrowdClassCoefficient(
-        updateTimetableDto.studentCount,
+    // Update crowd class coefficient if student count changes
+    if (studentCount && studentCount !== timetable.studentCount) {
+      timetable.studentCount = studentCount;
+      // Update HSLĐ based on student count
+      switch (true) {
+        case studentCount >= 101:
+          timetable.crowdClassCoefficient = 1.5;
+          break;
+        case studentCount >= 81:
+          timetable.crowdClassCoefficient = 1.4;
+          break;
+        case studentCount >= 66:
+          timetable.crowdClassCoefficient = 1.3;
+          break;
+        case studentCount >= 51:
+          timetable.crowdClassCoefficient = 1.2;
+          break;
+        case studentCount >= 41:
+          timetable.crowdClassCoefficient = 1.1;
+          break;
+        default:
+          timetable.crowdClassCoefficient = 1;
+      }
+    }
+
+    // Batch check for academic year and course if needed
+    const entitiesToCheck: Promise<any>[] = [];
+
+    if (academicYearId && academicYearId !== timetable.academicYearId) {
+      entitiesToCheck.push(
+        this.academicYearRepository
+          .findOne({ where: { id: academicYearId } })
+          .then((year) => {
+            if (!year) throw new NotFoundException('Năm học không tồn tại');
+            timetable.academicYearId = year.id;
+          }),
       );
     }
 
-    // Check academic year exists if it's changed
-    if (
-      updateTimetableDto.academicYearId &&
-      updateTimetableDto.academicYearId !== timetable.academicYearId
-    ) {
-      const academicYear = await this.academicYearRepository.findOne({
-        where: { id: updateTimetableDto.academicYearId },
-      });
-      if (!academicYear) {
-        throw new NotFoundException('Năm học không tồn tại');
-      }
-      timetable.academicYearId = academicYear.id;
+    if (courseId && courseId !== timetable.courseId) {
+      entitiesToCheck.push(
+        this.courseRepository
+          .findOne({ where: { id: courseId } })
+          .then((course) => {
+            if (!course) throw new NotFoundException('Học phần không tồn tại');
+            timetable.courseId = course.id;
+          }),
+      );
     }
 
-    // Check course exists if it's changed
-    if (
-      updateTimetableDto.courseId &&
-      updateTimetableDto.courseId !== timetable.courseId
-    ) {
-      const course = await this.courseRepository.findOne({
-        where: { id: updateTimetableDto.courseId },
-      });
-      if (!course) {
-        throw new NotFoundException('Học phần không tồn tại');
-      }
-      timetable.courseId = course.id;
+    if (entitiesToCheck.length > 0) {
+      await Promise.all(entitiesToCheck);
     }
 
-    // update standardHours
-    this.updateStandardHours(updateTimetableDto, timetable);
+    // Update standard hours if needed
+    if (
+      (actualHours && actualHours !== timetable.actualHours) ||
+      (studentCount && studentCount !== timetable.studentCount)
+    ) {
+      timetable.actualHours = actualHours || timetable.actualHours;
+      timetable.standardHours =
+        timetable.actualHours *
+        timetable.crowdClassCoefficient *
+        timetable.overtimeCoefficient;
+    }
 
-    // Merge dữ liệu mới vào entity cũ
     Object.assign(timetable, rest);
-
     return await this.timetableRepository.save(timetable);
   }
 
-  private updateCrowdClassCoefficient(studentCount: number): number {
-    let crowdClassCoefficient = 1;
-    switch (true) {
-      case studentCount >= 101:
-        crowdClassCoefficient = 1.5;
-        break;
-      case studentCount >= 81:
-        crowdClassCoefficient = 1.4;
-        break;
-      case studentCount >= 66:
-        crowdClassCoefficient = 1.3;
-        break;
-      case studentCount >= 51:
-        crowdClassCoefficient = 1.2;
-        break;
-      case studentCount >= 41:
-        crowdClassCoefficient = 1.1;
-        break;
-    }
-    return crowdClassCoefficient;
-  }
-
-  private updateStandardHours(
-    updateDto: UpdateTimetableDto,
-    existingTimetable: TimetableEntity,
-  ) {
-    const { actualHours, studentCount } = updateDto;
-
-    if (
-      (actualHours && actualHours !== existingTimetable.actualHours) ||
-      (studentCount && studentCount !== existingTimetable.studentCount)
-    ) {
-      existingTimetable.standardHours =
-        actualHours! *
-        existingTimetable.crowdClassCoefficient *
-        existingTimetable.overtimeCoefficient;
-    }
-  }
-
   async remove(id: string): Promise<void> {
-    try {
-      const timetable = await this.findOne(id);
-      await this.timetableRepository.remove(timetable);
-    } catch (error) {
+    const result = await this.timetableRepository.delete(id);
+    if (result.affected === 0) {
       throw new NotFoundException('Không tìm thấy thời khóa biểu');
     }
   }
 
-  // Phiên bản checkConflict sử dụng EntityManager cho transaction
-  private async checkConflictWithManager(
-    conflictDto: TimetableConflictCheckDto,
-    manager: EntityManager,
-  ): Promise<void> {
-    // Chỉ check nếu roomName bắt đầu bằng số
-    const isRealRoom = /^[0-9]/.test(conflictDto.roomName);
-    if (!isRealRoom) {
-      return;
-    }
-
-    const queryBuilder = manager
-      .createQueryBuilder(TimeSlotEntity, 'timeSlot')
-      .innerJoin('timeSlot.classroom', 'classroom')
-      .innerJoin('classroom.building', 'building')
-      .where('classroom.name = :roomName', {
-        roomName: conflictDto.roomName,
-      })
-      .andWhere('building.name = :buildingName', {
-        buildingName: conflictDto.buildingName || 'Chung',
-      })
-      .andWhere('timeSlot.dayOfWeek = :dayOfWeek', {
-        dayOfWeek: conflictDto.dayOfWeek,
-      })
-      .andWhere('timeSlot.timeSlot = :timeSlot', {
-        timeSlot: conflictDto.timeSlot,
-      })
-      .andWhere('timeSlot.startDate <= :endDate', {
-        endDate: conflictDto.endDate,
-      })
-      .andWhere('timeSlot.endDate >= :startDate', {
-        startDate: conflictDto.startDate,
-      })
-      .andWhere(
-        conflictDto.excludeId ? 'timeSlot.timetableId != :excludeId' : '1=1',
-        { excludeId: conflictDto.excludeId },
-      );
-
-    const conflictingTimeSlots = await queryBuilder.getMany();
-
-    if (conflictingTimeSlots.length > 0) {
-      throw new ConflictException(
-        'Phòng học đã có lịch trùng với thời gian này',
-      );
-    }
-  }
-
-  // Upload thời khóa biểu từ Excel
-  // Duyệt qua tất cả các dòng dl được parse, xử lý từng dòng và ghi nhận kết quả
   async uploadFromExcel(uploadDto: TimetableUploadDto): Promise<{
     success: number;
     errors: Array<{ row: number; data: TimetableUploadDataDto; error: string }>;
   }> {
-    const results: {
-      success: number;
-      errors: Array<{
+    const results = {
+      success: 0,
+      errors: [] as Array<{
         row: number;
         data: TimetableUploadDataDto;
         error: string;
-      }>;
-    } = { success: 0, errors: [] };
+      }>,
+    };
 
-    // Sử dụng transaction để đảm bảo tính toàn vẹn dữ liệu
     await this.dataSource.transaction(async (manager) => {
+      // Pre-load all needed data to minimize queries
+      const courseCodeSet = new Set<string>();
+      const yearCodeSet = new Set<string>();
+
+      for (const item of uploadDto.data) {
+        courseCodeSet.add(item.courseCode);
+        const yearCode = this.extractSchoolYear(item.startDate);
+        yearCodeSet.add(yearCode);
+      }
+
+      // Batch load existing courses and academic years
+      const [existingCourses, existingYears] = await Promise.all([
+        manager.find(CourseEntity, {
+          where: { courseCode: In(Array.from(courseCodeSet)) },
+        }),
+        manager.find(AcademicYearEntity, {
+          where: { yearCode: In(Array.from(yearCodeSet)) },
+        }),
+      ]);
+
+      const courseMap = new Map(existingCourses.map((c) => [c.courseCode, c]));
+      const yearMap = new Map(existingYears.map((y) => [y.yearCode, y]));
+
+      // Prepare entities to batch insert
+      const coursesToInsert: CourseEntity[] = [];
+      const yearsToInsert: AcademicYearEntity[] = [];
+      const timetablesToProcess: Array<{
+        index: number;
+        data: TimetableUploadDataDto;
+        dto: CreateTimetableDto;
+      }> = [];
+
+      // Process each row
       for (const [index, item] of uploadDto.data.entries()) {
         try {
-          // xử lý và lưu vào DB với transaction manager
-          await this.processExcelRow(item, manager);
-          // nếu thành công -> tăng success
-          results.success++;
+          const semester = this.getSemester(item.startDate, item.endDate);
+          const yearCode = this.extractSchoolYear(item.startDate);
+          const classType = item.classType.toUpperCase();
+
+          // Get or prepare course
+          let course = courseMap.get(item.courseCode);
+          if (!course) {
+            course = manager.create(CourseEntity, {
+              courseCode: item.courseCode,
+              courseName: item.className.replace(/-\d+-\d+.*$/, '').trim(),
+              credits: item.credits,
+              semester,
+            });
+            coursesToInsert.push(course);
+            courseMap.set(item.courseCode, course);
+          }
+
+          // Get or prepare academic year
+          let year = yearMap.get(yearCode);
+          if (!year) {
+            year = manager.create(AcademicYearEntity, { yearCode });
+            yearsToInsert.push(year);
+            yearMap.set(yearCode, year);
+          }
+
+          const createDto: CreateTimetableDto = {
+            className: item.className,
+            classType,
+            semester,
+            studentCount: item.studentCount,
+            theoryHours: item.theoryHours,
+            crowdClassCoefficient: item.crowdClassCoefficient,
+            actualHours: item.actualHours,
+            overtimeCoefficient: item.overtimeCoefficient,
+            standardHours: item.standardHours,
+            lecturerName: item.lecturerName,
+            startDate: item.startDate,
+            endDate: item.endDate,
+            detailTimeSlots: item.detailTimeSlots,
+            courseId: course.id,
+            academicYearId: year.id,
+          };
+
+          timetablesToProcess.push({ index, data: item, dto: createDto });
         } catch (error: any) {
-          // lỗi -> ghi nhận row, data và error.message vào results.errors
           results.errors.push({
             row: index + 1,
             data: item,
+            error: error.message,
+          });
+        }
+      }
+
+      // Batch insert new courses and years
+      if (coursesToInsert.length > 0) {
+        const savedCourses = await manager.save(CourseEntity, coursesToInsert);
+        savedCourses.forEach((c) => courseMap.set(c.courseCode, c));
+      }
+
+      if (yearsToInsert.length > 0) {
+        const savedYears = await manager.save(
+          AcademicYearEntity,
+          yearsToInsert,
+        );
+        savedYears.forEach((y) => yearMap.set(y.yearCode, y));
+      }
+
+      // Update IDs and create timetables
+      for (const { index, data, dto } of timetablesToProcess) {
+        try {
+          // Update with actual saved IDs
+          dto.courseId = courseMap.get(data.courseCode)!.id;
+          dto.academicYearId = yearMap.get(
+            this.extractSchoolYear(data.startDate),
+          )!.id;
+
+          await this.createWithManager(dto, manager);
+          results.success++;
+        } catch (error: any) {
+          results.errors.push({
+            row: index + 1,
+            data,
             error: error.message,
           });
         }
@@ -413,46 +527,6 @@ export class TimetableService {
     return results;
   }
 
-  // Xử lý 1 dòng dữ liệu Excel, ánh xạ sang CreateTimeTableDto rồi gọi hàm create để lưu vào DB
-  private async processExcelRow(
-    data: TimetableUploadDataDto,
-    manager: EntityManager,
-  ): Promise<void> {
-    const semester = getSemester(data.startDate, data.endDate);
-
-    // Find course by code
-    // 1. Tìm học phần (course) theo courseCode
-    const course = await this.getOrCreateCourse(data, semester, manager);
-
-    // 2. Tìm hoặc tạo Academic Year nếu chưa có
-    const academicYearId = await this.getOrCreateAcademicYear(data, manager);
-
-    // Map class type
-    // Xác định loại lớp
-    const classType = data.classType.toUpperCase();
-
-    // tạo DTO
-    const createDto: CreateTimetableDto = {
-      className: data.className,
-      classType,
-      semester,
-      studentCount: data.studentCount,
-      theoryHours: data.theoryHours,
-      crowdClassCoefficient: data.crowdClassCoefficient,
-      actualHours: data.actualHours,
-      overtimeCoefficient: data.overtimeCoefficient,
-      standardHours: data.standardHours,
-      lecturerName: data.lecturerName,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      detailTimeSlots: data.detailTimeSlots,
-      courseId: course.id,
-      academicYearId,
-    };
-
-    await this.createWithManager(createDto, manager);
-  }
-
   private extractSchoolYear(startDate: string): string {
     const date = new Date(startDate);
     if (isNaN(date.getTime())) {
@@ -460,7 +534,7 @@ export class TimetableService {
     }
 
     const year = date.getFullYear();
-    const month = date.getMonth() + 1; // getMonth() trả về 0-11
+    const month = date.getMonth() + 1;
 
     let startYear: number;
     let endYear: number;
@@ -476,75 +550,25 @@ export class TimetableService {
     return `${startYear}-${endYear}`;
   }
 
-  private async getOrCreateCourse(
-    data: TimetableUploadDataDto,
-    semester: KyHoc,
-    manager: EntityManager,
-  ): Promise<CourseEntity> {
-    let course = await manager.findOne(CourseEntity, {
-      where: { courseCode: data.courseCode },
-    });
+  private getSemester(startDateStr: string, endDateStr: string): KyHoc {
+    const startMonth = new Date(startDateStr).getMonth() + 1;
+    const endMonth = new Date(endDateStr).getMonth() + 1;
 
-    if (!course) {
-      try {
-        course = manager.create(CourseEntity, {
-          courseCode: data.courseCode,
-          courseName: data.className.replace(/-\d+-\d+.*$/, '').trim(),
-          credits: data.credits,
-          semester,
-        });
-        course = await manager.save(CourseEntity, course);
-      } catch (error) {
-        console.error(`Error creating course ${data.courseCode}:`, error);
-        throw error; // hoặc return để không chạy tiếp
-      }
+    switch (true) {
+      case startMonth >= 8 && endMonth <= 10:
+        return KyHoc.KI_1_1;
+      case startMonth >= 10 && endMonth <= 12:
+        return KyHoc.KI_1_2;
+      case startMonth >= 1 && endMonth <= 4:
+        return KyHoc.KI_2_1;
+      case startMonth >= 4 && endMonth <= 7:
+        return KyHoc.KI_2_2;
+      case startMonth >= 8 && endMonth <= 12:
+        return KyHoc.KI_1_2;
+      case startMonth >= 1 && endMonth <= 7:
+        return KyHoc.KI_2_2;
+      default:
+        return KyHoc.KI_2_2;
     }
-    return course;
-  }
-
-  private async getOrCreateAcademicYear(
-    data: TimetableUploadDataDto,
-    manager: EntityManager,
-  ): Promise<string> {
-    const extractedYear = this.extractSchoolYear(data.startDate);
-
-    let year = await manager.findOne(AcademicYearEntity, {
-      where: { yearCode: extractedYear },
-    });
-    if (!year) {
-      year = manager.create(AcademicYearEntity, { yearCode: extractedYear });
-      year = await manager.save(AcademicYearEntity, year);
-    }
-    return year.id;
-  }
-}
-
-function getSemester(startDateStr: string, endDateStr: string): KyHoc {
-  const startMonth = new Date(startDateStr).getMonth() + 1; // 1–12
-  const endMonth = new Date(endDateStr).getMonth() + 1;
-
-  switch (true) {
-    case startMonth >= 8 && endMonth <= 10:
-      return KyHoc.KI_1_1;
-
-    case startMonth >= 10 && endMonth <= 12:
-      return KyHoc.KI_1_2;
-
-    case startMonth >= 1 && endMonth <= 4:
-      return KyHoc.KI_2_1;
-
-    case startMonth >= 4 && endMonth <= 7:
-      return KyHoc.KI_2_2;
-
-    // fallback
-    case startMonth >= 8 && endMonth <= 12:
-      return KyHoc.KI_1_2;
-
-    case startMonth >= 1 && endMonth <= 7:
-      return KyHoc.KI_2_2;
-
-    default:
-      // Nếu không rơi vào khoảng nào (ví dụ tháng 1), mặc định cho về "Kỳ 2 đợt 2"
-      return KyHoc.KI_2_2;
   }
 }
