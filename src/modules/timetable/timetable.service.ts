@@ -327,7 +327,7 @@ export class TimetableService {
       .where('classroom.name = :roomName', {
         roomName: conflictDto.roomName,
       })
-      .andWhere('classroom.building.name = :buildingName', {
+      .andWhere('building.name = :buildingName', {
         buildingName: conflictDto.buildingName || 'Chung',
       })
       .andWhere('timeSlot.dayOfWeek = :dayOfWeek', {
