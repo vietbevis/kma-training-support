@@ -265,7 +265,6 @@ export class TimetableService {
       relations: {
         course: true,
         academicYear: true,
-        timeSlots: true,
       },
       skip,
       take: limit,
