@@ -197,14 +197,14 @@ export class TimetableService {
     updateDto: UpdateTimetableDto,
     existingTimetable: TimetableEntity,
   ) {
-    const { theoryHours, studentCount } = updateDto;
+    const { actualHours, studentCount } = updateDto;
 
     if (
-      (theoryHours && theoryHours !== existingTimetable.theoryHours) ||
+      (actualHours && actualHours !== existingTimetable.actualHours) ||
       (studentCount && studentCount !== existingTimetable.studentCount)
     ) {
       existingTimetable.standardHours =
-        theoryHours! *
+        actualHours! *
         existingTimetable.crowdClassCoefficient *
         existingTimetable.overtimeCoefficient;
     }
