@@ -4,6 +4,7 @@ import { AcademicYearEntity } from 'src/database/entities/academic-years.entity'
 import { ClassroomEntity } from 'src/database/entities/classrooms.entity';
 import { CourseEntity } from 'src/database/entities/course.entity';
 import { FacultyDepartmentEntity } from 'src/database/entities/faculty-department.entity';
+import { TimeSlotEntity } from 'src/database/entities/timeslot.entity';
 import { TimetableEntity } from 'src/database/entities/timetable.entity';
 import { UserEntity } from 'src/database/entities/user.entity';
 import { ExcelParserService } from './excel-parser.service';
@@ -14,6 +15,7 @@ import { TimetableService } from './timetable.service';
   imports: [
     TypeOrmModule.forFeature([
       TimetableEntity,
+      TimeSlotEntity,
       CourseEntity,
       AcademicYearEntity,
       ClassroomEntity,

@@ -1,12 +1,11 @@
 import { ApiHideProperty } from '@nestjs/swagger';
 import { Exclude, Type } from 'class-transformer';
-import { IsDateString, IsOptional, IsString } from 'class-validator';
 import { KyHoc } from 'src/shared/enums/semester.enum';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 import { AuditableEntity } from '../base/auditable.entity';
-import { DetailTimeSlot } from '../interface/detail-time-slot.interface';
 import { AcademicYearEntity } from './academic-years.entity';
 import { CourseEntity } from './course.entity';
+import { TimeSlotEntity } from './timeslot.entity';
 
 @Entity('tbl_timetables')
 export class TimetableEntity extends AuditableEntity {
@@ -91,7 +90,6 @@ export class TimetableEntity extends AuditableEntity {
     type: 'date',
     comment: 'Ngày bắt đầu',
   })
-  @IsDateString()
   startDate!: Date;
 
   @Column({
@@ -99,7 +97,6 @@ export class TimetableEntity extends AuditableEntity {
     type: 'date',
     comment: 'Ngày kết thúc',
   })
-  @IsDateString()
   endDate!: Date;
 
   @Column({
@@ -109,19 +106,14 @@ export class TimetableEntity extends AuditableEntity {
     nullable: true,
     comment: 'Tên giảng viên trên thời khóa biểu',
   })
-  @IsOptional()
-  @IsString()
   lecturerName?: string;
 
-  @Column({
-    type: 'jsonb',
-    name: 'detail_time_slots',
-    nullable: false,
-    comment: 'Chi tiết lịch học (mảng các slot)',
-  })
-  detailTimeSlots!: DetailTimeSlot[];
-
   // Relations
+  @OneToMany(() => TimeSlotEntity, (timeSlot) => timeSlot.timetable, {
+    cascade: true,
+    eager: false,
+  })
+  timeSlots!: TimeSlotEntity[];
   @Exclude()
   @ApiHideProperty()
   @Column({

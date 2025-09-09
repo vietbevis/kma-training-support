@@ -5,8 +5,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AcademicYearEntity } from 'src/database/entities/academic-years.entity';
+import { BuildingEntity } from 'src/database/entities/building.entity';
 import { ClassroomEntity } from 'src/database/entities/classrooms.entity';
 import { CourseEntity } from 'src/database/entities/course.entity';
+import { TimeSlotEntity } from 'src/database/entities/timeslot.entity';
 import { TimetableEntity } from 'src/database/entities/timetable.entity';
 import { KyHoc } from 'src/shared/enums/semester.enum';
 import { Between, DataSource, EntityManager, ILike, Repository } from 'typeorm';
@@ -24,6 +26,8 @@ export class TimetableService {
   constructor(
     @InjectRepository(TimetableEntity)
     private readonly timetableRepository: Repository<TimetableEntity>,
+    @InjectRepository(TimeSlotEntity)
+    private readonly timeSlotRepository: Repository<TimeSlotEntity>,
     @InjectRepository(CourseEntity)
     private readonly courseRepository: Repository<CourseEntity>,
     @InjectRepository(AcademicYearEntity)
@@ -58,8 +62,90 @@ export class TimetableService {
       }
     }
 
-    const timetable = manager.create(TimetableEntity, createTimetableDto);
-    return await manager.save(TimetableEntity, timetable);
+    // Tạo timetable entity (không có detailTimeSlots)
+    const { detailTimeSlots, ...timetableData } = createTimetableDto;
+    const timetable = manager.create(TimetableEntity, timetableData);
+    const savedTimetable = await manager.save(TimetableEntity, timetable);
+
+    const buildingMap = new Map<string, BuildingEntity>();
+
+    // Kiểm tra classroom và building có tồn tại không nếu không thì tạo mới
+    for (const slot of detailTimeSlots) {
+      if (
+        slot.roomName.trim() !== '' &&
+        slot.buildingName &&
+        slot.buildingName.trim() !== ''
+      ) {
+        let building = await manager.findOne(BuildingEntity, {
+          where: { name: slot.buildingName.trim() },
+          relations: { classrooms: true },
+        });
+        if (!building) {
+          building = manager.create(BuildingEntity, {
+            name: slot.buildingName.trim(),
+          });
+          building = await manager.save(BuildingEntity, building);
+        }
+
+        if (!building.classrooms.some((c) => c.name === slot.roomName.trim())) {
+          const classroom = manager.create(ClassroomEntity, {
+            name: slot.roomName.trim(),
+            buildingId: building.id,
+          });
+          await manager.save(ClassroomEntity, classroom);
+        }
+        buildingMap.set(building.name, building);
+      } else {
+        let building = await manager.findOne(BuildingEntity, {
+          where: { name: 'Chung' },
+          relations: { classrooms: true },
+        });
+        if (!building) {
+          building = manager.create(BuildingEntity, {
+            name: 'Chung',
+          });
+          building = await manager.save(BuildingEntity, building);
+        }
+
+        if (!building.classrooms.some((c) => c.name === slot.roomName.trim())) {
+          const classroom = manager.create(ClassroomEntity, {
+            name: slot.roomName.trim(),
+            buildingId: building.id,
+          });
+          await manager.save(ClassroomEntity, classroom);
+        }
+        buildingMap.set(building.name, building);
+      }
+    }
+
+    // Tạo các timeslot entities riêng biệt
+    if (detailTimeSlots && detailTimeSlots.length > 0) {
+      const timeSlotEntities = detailTimeSlots.map((slot) => {
+        return manager.create(TimeSlotEntity, {
+          dayOfWeek: slot.dayOfWeek,
+          timeSlot: slot.timeSlot,
+          classroomId: buildingMap
+            .get(slot.buildingName || 'Chung')
+            ?.classrooms.find((c) => c.name === slot.roomName)?.id,
+          startDate: new Date(slot.startDate),
+          endDate: new Date(slot.endDate),
+          timetableId: savedTimetable.id,
+        });
+      });
+
+      await manager.save(TimeSlotEntity, timeSlotEntities);
+      savedTimetable.timeSlots = timeSlotEntities;
+    }
+
+    return savedTimetable;
+  }
+
+  async create(
+    createTimetableDto: CreateTimetableDto,
+  ): Promise<TimetableEntity> {
+    return await this.dataSource.transaction(async (manager) => {
+      return await this.createWithManager(createTimetableDto, manager);
+    });
   }
 
   async findAll(query: TimetableQueryDto) {
@@ -82,6 +168,7 @@ export class TimetableService {
       relations: {
         course: true,
         academicYear: true,
+        timeSlots: true,
       },
       skip,
       take: limit,
@@ -107,6 +194,7 @@ export class TimetableService {
       relations: {
         course: true,
         academicYear: true,
+        timeSlots: true,
       },
     });
 
@@ -230,36 +318,30 @@ export class TimetableService {
       return;
     }
 
-    const conflictingSchedules = await manager
-      .createQueryBuilder(TimetableEntity, 'timetable')
-      .where(
-        `
-      EXISTS (
-        SELECT 1
-        FROM jsonb_array_elements(timetable.detail_time_slots) as slot
-        WHERE slot->>'roomName' = :roomName
-          AND slot->>'buildingName' = :buildingName
-          AND (slot->>'dayOfWeek')::int = :dayOfWeek
-          AND slot->>'timeSlot' = :timeSlot
-          AND (slot->>'startDate')::date <= :endDate
-          AND (slot->>'endDate')::date >= :startDate
-      )
-    `,
-        {
-          roomName: conflictDto.roomName,
-          buildingName: conflictDto.buildingName,
-          dayOfWeek: conflictDto.dayOfWeek,
-          timeSlot: conflictDto.timeSlot,
-          startDate: conflictDto.startDate,
-          endDate: conflictDto.endDate,
-        },
-      )
-      .andWhere(conflictDto.excludeId ? 'timetable.id != :excludeId' : '1=1', {
-        excludeId: conflictDto.excludeId,
+    const conflictingTimeSlots = await manager
+      .createQueryBuilder(TimeSlotEntity, 'timeSlot')
+      .where('timeSlot.roomName = :roomName', {
+        roomName: conflictDto.roomName,
       })
+      .andWhere('timeSlot.dayOfWeek = :dayOfWeek', {
+        dayOfWeek: conflictDto.dayOfWeek,
+      })
+      .andWhere('timeSlot.timeSlot = :timeSlot', {
+        timeSlot: conflictDto.timeSlot,
+      })
+      .andWhere('timeSlot.startDate <= :endDate', {
+        endDate: conflictDto.endDate,
+      })
+      .andWhere('timeSlot.endDate >= :startDate', {
+        startDate: conflictDto.startDate,
+      })
+      .andWhere(
+        conflictDto.excludeId ? 'timeSlot.timetableId != :excludeId' : '1=1',
+        { excludeId: conflictDto.excludeId },
+      )
       .getMany();
 
-    if (conflictingSchedules.length > 0) {
+    if (conflictingTimeSlots.length > 0) {
       throw new ConflictException(
         'Phòng học đã có lịch trùng với thời gian này',
       );
