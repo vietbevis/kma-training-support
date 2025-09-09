@@ -1,4 +1,9 @@
-import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  OmitType,
+  PartialType,
+} from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayNotEmpty,
@@ -114,7 +119,6 @@ export class CreateTimetableDto {
   @Type(() => DetailTimeSlotsDto)
   detailTimeSlots!: DetailTimeSlotsDto[];
 
-
   @ApiProperty({ description: 'ID học phần' })
   @IsUUID()
   courseId!: string;
@@ -125,9 +129,15 @@ export class CreateTimetableDto {
 }
 
 export class UpdateTimetableDto extends PartialType(
-  OmitType(CreateTimetableDto, ['courseId', 'academicYearId', 'crowdClassCoefficient', 'overtimeCoefficient', 'standardHours', 'detailTimeSlots' ] as const),
+  OmitType(CreateTimetableDto, [
+    'courseId',
+    'academicYearId',
+    'crowdClassCoefficient',
+    'overtimeCoefficient',
+    'standardHours',
+    'detailTimeSlots',
+  ] as const),
 ) {}
-
 
 export class TimetableQueryDto {
   @ApiPropertyOptional({ description: 'ID học phần' })
@@ -282,4 +292,3 @@ export class TimetableUploadDto {
   @Type(() => TimetableUploadDataDto)
   data!: TimetableUploadDataDto[];
 }
-

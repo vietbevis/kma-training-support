@@ -152,7 +152,6 @@ export class TimetableService {
     // update standardHours
     this.updateStandardHours(updateTimetableDto, timetable);
 
-
     // Merge dữ liệu mới vào entity cũ
     Object.assign(timetable, updateTimetableDto);
 
@@ -206,7 +205,6 @@ export class TimetableService {
       throw new NotFoundException('Không tìm thấy thời khóa biểu');
     }
   }
-
 
   // Phiên bản checkConflict sử dụng EntityManager cho transaction
   private async checkConflictWithManager(

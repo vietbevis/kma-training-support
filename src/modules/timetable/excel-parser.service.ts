@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
 import * as XLSX from 'xlsx';
 import { TimetableUploadDataDto } from './timetable.dto';
-import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
 @Injectable()
 export class ExcelParserService {
   async parseExcelFile(fileBuffer: Buffer): Promise<TimetableUploadDataDto[]> {
@@ -12,8 +12,6 @@ export class ExcelParserService {
       const allData: TimetableUploadDataDto[] = [];
 
       for (const sheetName of sheetNames) {
-
-
         const worksheet = workbook.Sheets[sheetName];
         const rawData = XLSX.utils.sheet_to_json(worksheet, {
           header: 1,
@@ -85,7 +83,9 @@ export class ExcelParserService {
         }
 
         // get pure className
-        const pureClassName = this.getPureClassName(String(row[columnMap.className] || '').trim())
+        const pureClassName = this.getPureClassName(
+          String(row[columnMap.className] || '').trim(),
+        );
 
         currentCourse = {
           order: this.parseNumber(row[columnMap.tt]),
@@ -200,14 +200,12 @@ export class ExcelParserService {
     return result;
   }
 
-
   private getPureClassName(className: string): string {
-    if (!className) return "";
+    if (!className) return '';
 
     // Regex: tìm "-số-số" và bỏ hết từ đó trở đi
-    return className.replace(/-\d+-\d+.*$/, "").trim();
+    return className.replace(/-\d+-\d+.*$/, '').trim();
   }
-
 
   private mapColumns(headerRow: any[]): Record<string, number> {
     const columnMap: Record<string, number> = {};
