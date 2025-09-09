@@ -114,10 +114,6 @@ export class CreateTimetableDto {
   @Type(() => DetailTimeSlotsDto)
   detailTimeSlots!: DetailTimeSlotsDto[];
 
-  @ApiPropertyOptional({ description: 'Ghi chú' })
-  @IsOptional()
-  @IsString()
-  notes?: string;
 
   @ApiProperty({ description: 'ID học phần' })
   @IsUUID()
