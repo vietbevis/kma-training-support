@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AcademicYearEntity } from 'src/database/entities/academic-years.entity';
+import { BuildingEntity } from 'src/database/entities/building.entity';
 import { ClassroomEntity } from 'src/database/entities/classrooms.entity';
 import { CourseEntity } from 'src/database/entities/course.entity';
 import { FacultyDepartmentEntity } from 'src/database/entities/faculty-department.entity';
@@ -18,6 +19,7 @@ import { TimetableService } from './timetable.service';
       TimeSlotEntity,
       CourseEntity,
       AcademicYearEntity,
+      BuildingEntity,
       ClassroomEntity,
       FacultyDepartmentEntity,
       UserEntity,

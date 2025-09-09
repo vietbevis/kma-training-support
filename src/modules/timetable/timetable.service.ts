@@ -32,6 +32,8 @@ export class TimetableService {
     private readonly courseRepository: Repository<CourseEntity>,
     @InjectRepository(AcademicYearEntity)
     private readonly academicYearRepository: Repository<AcademicYearEntity>,
+    @InjectRepository(BuildingEntity)
+    private readonly buildingRepository: Repository<BuildingEntity>,
     @InjectRepository(ClassroomEntity)
     private readonly classroomRepository: Repository<ClassroomEntity>,
     private readonly dataSource: DataSource,
@@ -318,10 +320,15 @@ export class TimetableService {
       return;
     }
 
-    const conflictingTimeSlots = await manager
+    const queryBuilder = manager
       .createQueryBuilder(TimeSlotEntity, 'timeSlot')
-      .where('timeSlot.roomName = :roomName', {
+      .innerJoin('timeSlot.classroom', 'classroom')
+      .innerJoin('classroom.building', 'building')
+      .where('classroom.name = :roomName', {
         roomName: conflictDto.roomName,
+      })
+      .andWhere('classroom.building.name = :buildingName', {
+        buildingName: conflictDto.buildingName || 'Chung',
       })
       .andWhere('timeSlot.dayOfWeek = :dayOfWeek', {
         dayOfWeek: conflictDto.dayOfWeek,
@@ -338,8 +345,9 @@ export class TimetableService {
       .andWhere(
         conflictDto.excludeId ? 'timeSlot.timetableId != :excludeId' : '1=1',
         { excludeId: conflictDto.excludeId },
-      )
-      .getMany();
+      );
+
+    const conflictingTimeSlots = await queryBuilder.getMany();
 
     if (conflictingTimeSlots.length > 0) {
       throw new ConflictException(
