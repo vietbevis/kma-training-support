@@ -138,6 +138,7 @@ export class TimetableService {
     updateTimetableDto: UpdateTimetableDto,
   ): Promise<TimetableEntity> {
     const timetable = await this.findOne(id);
+    const { courseId, academicYearId, ...rest } = updateTimetableDto;
 
     if (
       updateTimetableDto.studentCount &&
@@ -149,11 +150,39 @@ export class TimetableService {
       );
     }
 
+    // Check academic year exists if it's changed
+    if (
+      updateTimetableDto.academicYearId &&
+      updateTimetableDto.academicYearId !== timetable.academicYearId
+    ) {
+      const academicYear = await this.academicYearRepository.findOne({
+        where: { id: updateTimetableDto.academicYearId },
+      });
+      if (!academicYear) {
+        throw new NotFoundException('Năm học không tồn tại');
+      }
+      timetable.academicYearId = academicYear.id;
+    }
+
+    // Check course exists if it's changed
+    if (
+      updateTimetableDto.courseId &&
+      updateTimetableDto.courseId !== timetable.courseId
+    ) {
+      const course = await this.courseRepository.findOne({
+        where: { id: updateTimetableDto.courseId },
+      });
+      if (!course) {
+        throw new NotFoundException('Học phần không tồn tại');
+      }
+      timetable.courseId = course.id;
+    }
+
     // update standardHours
     this.updateStandardHours(updateTimetableDto, timetable);
 
     // Merge dữ liệu mới vào entity cũ
-    Object.assign(timetable, updateTimetableDto);
+    Object.assign(timetable, rest);
 
     return await this.timetableRepository.save(timetable);
   }

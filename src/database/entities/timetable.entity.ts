@@ -1,23 +1,12 @@
 import { ApiHideProperty } from '@nestjs/swagger';
 import { Exclude, Type } from 'class-transformer';
-import {
-  IsDateString,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  Min,
-} from 'class-validator';
-import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
+import { IsDateString, IsOptional, IsString } from 'class-validator';
 import { KyHoc } from 'src/shared/enums/semester.enum';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 import { AuditableEntity } from '../base/auditable.entity';
-import { AcademicYearEntity } from './academic-years.entity';
-import { ClassroomEntity } from './classrooms.entity';
-import { CourseEntity } from './course.entity';
-import { FacultyDepartmentEntity } from './faculty-department.entity';
-import { UserEntity } from './user.entity';
 import { DetailTimeSlot } from '../interface/detail-time-slot.interface';
+import { AcademicYearEntity } from './academic-years.entity';
+import { CourseEntity } from './course.entity';
 
 @Entity('tbl_timetables')
 export class TimetableEntity extends AuditableEntity {
@@ -29,7 +18,6 @@ export class TimetableEntity extends AuditableEntity {
       'Tên lớp học phần cụ thể (VD: Chuyên đề chuyên ngành chuyên sâu-1-25 (A1801))',
   })
   className!: string;
-
 
   @Column({
     type: 'enum',
@@ -50,18 +38,14 @@ export class TimetableEntity extends AuditableEntity {
     default: 0,
     comment: 'Số sinh viên đăng ký',
   })
-  @IsInt()
-  @Min(0)
   studentCount!: number;
 
   @Column({
     name: 'theory_hours',
     type: 'int',
     default: 0,
-    comment: 'Số tiết lý thuyết',
+    comment: 'LL',
   })
-  @IsInt()
-  @Min(0)
   theoryHours!: number;
 
   @Column({
@@ -76,14 +60,11 @@ export class TimetableEntity extends AuditableEntity {
 
   @Column({
     name: 'actual_hours',
-    type: 'decimal',
-    precision: 6,
-    scale: 2,
+    type: 'int',
     default: 0,
-    comment: 'Số tiết thực (tính hệ số)',
+    comment: 'LL thực',
   })
   actualHours!: number;
-
 
   @Column({
     name: 'overtime_coefficient',
@@ -94,7 +75,6 @@ export class TimetableEntity extends AuditableEntity {
     comment: 'Hệ số ngoài giờ',
   })
   overtimeCoefficient!: number;
-  
 
   @Column({
     name: 'standard_hours',

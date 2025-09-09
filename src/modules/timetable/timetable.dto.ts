@@ -130,8 +130,6 @@ export class CreateTimetableDto {
 
 export class UpdateTimetableDto extends PartialType(
   OmitType(CreateTimetableDto, [
-    'courseId',
-    'academicYearId',
     'crowdClassCoefficient',
     'overtimeCoefficient',
     'standardHours',
