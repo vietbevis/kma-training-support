@@ -76,7 +76,7 @@ export const ENTITY_NAME_MAPPING = Object.freeze({
   // Học thuật
   AcademicCredentialsEntity: 'Học hàm học vị',
   AcademicYearEntity: 'Năm học',
-  CourseEntity: 'Khóa học',
+  CourseEntity: 'Học phần',
   EducationalSystemEntity: 'Hệ đào tạo',
   SubjectEntity: 'Môn học',
   StandardLectureHoursEntity: 'Giờ chuẩn giảng dạy',
@@ -91,6 +91,9 @@ export const ENTITY_NAME_MAPPING = Object.freeze({
   // Hệ thống
   RefreshTokenEntity: 'Token làm mới',
   AuditLogEntity: 'Nhật ký kiểm toán',
+
+  // Thời khóa biểu
+  TimetableEntity: 'Thời khóa biểu',
 } as const);
 
 // Mapping tên fields sang tiếng Việt
@@ -220,6 +223,22 @@ export const FIELD_NAME_MAPPING = Object.freeze({
   createdById: 'Người tạo',
   updatedById: 'Người cập nhật',
   deletedById: 'Người xóa',
+
+  // Thời khóa biểu
+  classType: 'Hình thức học',
+  studentCount: 'Số sinh viên',
+  theoryHours: 'LL',
+  actualHours: 'LL thực',
+  standardHours: 'QC',
+  crowdClassCoefficient: 'Hệ số lớp đông',
+  overtimeCoefficient: 'Hệ số ngoài giờ (T7/CN)',
+  className: 'Tên lớp học phần',
+  lecturerName: 'Giảng viên',
+  startDate: 'Ngày bắt đầu',
+  endDate: 'Ngày kết thúc',
+  detailTimeSlots: 'Chi tiết lịch học',
+  courseId: 'Học phần',
+  academicYearId: 'Năm học',
 } as const);
 
 // Mapping relation column name tới entity name
