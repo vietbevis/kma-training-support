@@ -38,40 +38,30 @@ export class TimetableService {
     createTimetableDto: CreateTimetableDto,
     manager: EntityManager,
   ): Promise<TimetableEntity> {
-    // Validate course exists
-    const course = await manager.findOne(CourseEntity, {
-      where: { id: createTimetableDto.courseId },
-    });
-    if (!course) {
-      throw new NotFoundException('Học phần không tồn tại');
-    }
-
-    // Validate academic year exists
-    const academicYear = await manager.findOne(AcademicYearEntity, {
-      where: { id: createTimetableDto.academicYearId },
-    });
-    if (!academicYear) {
-      throw new NotFoundException('Năm học không tồn tại');
-    }
-
     // Check for conflicts if classroom is provided
     if (
       createTimetableDto.detailTimeSlots &&
       createTimetableDto.detailTimeSlots.length > 0
     ) {
-      for (const slot of createTimetableDto.detailTimeSlots) {
-        await this.checkConflictWithManager(
-          {
-            roomName: slot.roomName,
-            buildingName: slot.buildingName || '',
-            dayOfWeek: slot.dayOfWeek,
-            timeSlot: slot.timeSlot,
-            startDate: slot.startDate,
-            endDate: slot.endDate,
-          },
-          manager,
-        );
-      }
+      // for (const slot of createTimetableDto.detailTimeSlots) {
+      //   await this.checkConflictWithManager(
+      //     {
+      //       roomName: slot.roomName,
+      //       buildingName: slot.buildingName || '',
+      //       dayOfWeek: slot.dayOfWeek,
+      //       timeSlot: slot.timeSlot,
+      //       startDate: slot.startDate,
+      //       endDate: slot.endDate,
+      //     },
+      //     manager,
+      //   );
+      // }
+
+      await Promise.all(
+        createTimetableDto.detailTimeSlots.map((slot) => {
+          this.checkConflictWithManager(slot, manager);
+        }),
+      );
     }
 
     const timetable = manager.create(TimetableEntity, createTimetableDto);
@@ -395,7 +385,7 @@ export class TimetableService {
       try {
         course = manager.create(CourseEntity, {
           courseCode: data.courseCode,
-          courseName: data.className.replace(/\s*\([^)]*\)\s*$/, ''),
+          courseName: data.className.replace(/-\d+-\d+.*$/, '').trim(),
           credits: data.credits,
           semester,
         });

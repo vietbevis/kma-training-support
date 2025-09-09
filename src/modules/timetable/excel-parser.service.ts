@@ -202,9 +202,7 @@ export class ExcelParserService {
 
   private getPureClassName(className: string): string {
     if (!className) return '';
-
-    // Regex: tìm "-số-số" và bỏ hết từ đó trở đi
-    return className.replace(/-\d+-\d+.*$/, '').trim();
+    return className;
   }
 
   private mapColumns(headerRow: any[]): Record<string, number> {
