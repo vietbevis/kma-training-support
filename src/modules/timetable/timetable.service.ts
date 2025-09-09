@@ -92,6 +92,7 @@ export class TimetableService {
         if (!building.classrooms.some((c) => c.name === slot.roomName.trim())) {
           const classroom = manager.create(ClassroomEntity, {
             name: slot.roomName.trim(),
+            type: 'Phòng học',
             buildingId: building.id,
           });
           await manager.save(ClassroomEntity, classroom);
@@ -112,6 +113,7 @@ export class TimetableService {
         if (!building.classrooms.some((c) => c.name === slot.roomName.trim())) {
           const classroom = manager.create(ClassroomEntity, {
             name: slot.roomName.trim(),
+            type: slot.roomName.trim(),
             buildingId: building.id,
           });
           await manager.save(ClassroomEntity, classroom);
