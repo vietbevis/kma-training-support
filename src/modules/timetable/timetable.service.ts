@@ -43,25 +43,19 @@ export class TimetableService {
       createTimetableDto.detailTimeSlots &&
       createTimetableDto.detailTimeSlots.length > 0
     ) {
-      // for (const slot of createTimetableDto.detailTimeSlots) {
-      //   await this.checkConflictWithManager(
-      //     {
-      //       roomName: slot.roomName,
-      //       buildingName: slot.buildingName || '',
-      //       dayOfWeek: slot.dayOfWeek,
-      //       timeSlot: slot.timeSlot,
-      //       startDate: slot.startDate,
-      //       endDate: slot.endDate,
-      //     },
-      //     manager,
-      //   );
-      // }
-
-      await Promise.all(
-        createTimetableDto.detailTimeSlots.map((slot) => {
-          this.checkConflictWithManager(slot, manager);
-        }),
-      );
+      for (const slot of createTimetableDto.detailTimeSlots) {
+        await this.checkConflictWithManager(
+          {
+            roomName: slot.roomName,
+            buildingName: slot.buildingName || '',
+            dayOfWeek: slot.dayOfWeek,
+            timeSlot: slot.timeSlot,
+            startDate: slot.startDate,
+            endDate: slot.endDate,
+          },
+          manager,
+        );
+      }
     }
 
     const timetable = manager.create(TimetableEntity, createTimetableDto);
