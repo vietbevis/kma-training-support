@@ -101,13 +101,29 @@ export class CourseService {
       } = queryDto;
       const skip = (page - 1) * limit;
 
+      const whereConditions: any = {
+        facultyDepartmentId: facultyDepartmentId || undefined,
+        subjectId: subjectId || undefined,
+        semester: semester || undefined,
+      };
+
       const [data, total] = await this.courseRepository.findAndCount({
-        where: {
-          facultyDepartmentId: facultyDepartmentId || undefined,
-          subjectId: subjectId || undefined,
-          semester: semester || undefined,
-          courseCode: search ? ILike(`%${search}%`) : undefined,
-        },
+        where: [
+          {
+            ...whereConditions,
+            courseCode: search ? ILike(`%${search}%`) : undefined,
+          },
+          {
+            ...whereConditions,
+            courseName: search ? ILike(`%${search}%`) : undefined,
+          },
+        ].filter((condition) => {
+          if (!search) {
+            const { courseCode, courseName, ...rest } = condition;
+            return Object.keys(rest).length > 0 ? rest : {};
+          }
+          return condition;
+        }),
         relations: {
           facultyDepartment: true,
           subject: true,
