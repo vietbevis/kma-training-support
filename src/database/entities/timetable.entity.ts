@@ -141,16 +141,6 @@ export class TimetableEntity extends AuditableEntity {
   })
   detailTimeSlots!: DetailTimeSlot[];
 
-  @Column({
-    name: 'notes',
-    type: 'text',
-    nullable: true,
-    comment: 'Ghi chú',
-  })
-  @IsOptional()
-  @IsString()
-  notes?: string;
-
   // Relations
   @Exclude()
   @ApiHideProperty()
