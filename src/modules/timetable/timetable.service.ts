@@ -89,13 +89,22 @@ export class TimetableService {
           building = await manager.save(BuildingEntity, building);
         }
 
-        if (!building.classrooms.some((c) => c.name === slot.roomName.trim())) {
+        if (
+          !(building.classrooms || []).some(
+            (c) => c.name === slot.roomName.trim(),
+          )
+        ) {
           const classroom = manager.create(ClassroomEntity, {
             name: slot.roomName.trim(),
             type: 'Phòng học',
             buildingId: building.id,
           });
           await manager.save(ClassroomEntity, classroom);
+          if (building.classrooms && building.classrooms.length > 0) {
+            building.classrooms.push(classroom);
+          } else {
+            building.classrooms = [classroom];
+          }
         }
         buildingMap.set(building.name, building);
       } else {
@@ -110,13 +119,22 @@ export class TimetableService {
           building = await manager.save(BuildingEntity, building);
         }
 
-        if (!building.classrooms.some((c) => c.name === slot.roomName.trim())) {
+        if (
+          !(building.classrooms || []).some(
+            (c) => c.name === slot.roomName.trim(),
+          )
+        ) {
           const classroom = manager.create(ClassroomEntity, {
             name: slot.roomName.trim(),
             type: slot.roomName.trim(),
             buildingId: building.id,
           });
           await manager.save(ClassroomEntity, classroom);
+          if (building.classrooms && building.classrooms.length > 0) {
+            building.classrooms.push(classroom);
+          } else {
+            building.classrooms = [classroom];
+          }
         }
         buildingMap.set(building.name, building);
       }
