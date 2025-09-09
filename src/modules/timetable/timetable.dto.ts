@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayNotEmpty,
@@ -83,7 +83,7 @@ export class CreateTimetableDto {
 
   @ApiProperty({ description: 'Hệ số ngoài giờ' })
   @IsNumber()
-  @Min(0)
+  @Min(1)
   overtimeCoefficient!: number;
 
   @ApiProperty({ description: 'Số tiết quy chuẩn' })
@@ -128,7 +128,10 @@ export class CreateTimetableDto {
   academicYearId!: string;
 }
 
-export class UpdateTimetableDto extends PartialType(CreateTimetableDto) {}
+export class UpdateTimetableDto extends PartialType(
+  OmitType(CreateTimetableDto, ['courseId', 'academicYearId', 'crowdClassCoefficient', 'overtimeCoefficient', 'standardHours', 'detailTimeSlots' ] as const),
+) {}
+
 
 export class TimetableQueryDto {
   @ApiPropertyOptional({ description: 'ID học phần' })
@@ -284,73 +287,3 @@ export class TimetableUploadDto {
   data!: TimetableUploadDataDto[];
 }
 
-// export class CourseResponseDto {
-//   id!: string;
-//   courseCode!: string;
-//   courseName!: string;
-//   credits!: number;
-//   semester!: KyHoc;
-//   description?: string
-// }
-
-// export class AcademicYearResponseDto {
-//   id!: string;
-//   yearCode!: string;
-// }
-
-// // không cần validate trong response
-// export class TimetableResponseDto {
-//   @ApiProperty({ description: 'ID' })
-//   id!: string;
-
-//   @ApiProperty({ description: 'Tên lớp học phần' })
-//   className!: string;
-
-//   @ApiProperty({ enum: KyHoc, description: 'Kỳ học' })
-//   semester!: KyHoc;
-
-//   @ApiProperty({ description: 'Hình thức học' })
-//   classType!: string;
-
-//   @ApiProperty({ description: 'Số sinh viên' })
-//   studentCount!: number;
-
-//   @ApiProperty({ description: 'Số tiết lý thuyết' })
-//   theoryHours!: number;
-
-//   @ApiProperty({ description: 'Hệ số lớp đông' })
-//   crowdClassCoefficient!: number;
-
-//   @ApiProperty({ description: 'Số tiết thực (tính hệ số)' })
-//   actualHours!: number;
-
-//   @ApiProperty({ description: 'Hệ số ngoài giờ' })
-//   overtimeCoefficient!: number;
-
-//   @ApiProperty({ description: 'Số tiết quy chuẩn' })
-//   standardHours!: number;
-
-//   @ApiProperty({ description: 'Ngày bắt đầu' })
-//   startDate!: string;
-
-//   @ApiProperty({ description: 'Ngày kết thúc' })
-//   endDate!: string;
-
-//   @ApiPropertyOptional({ description: 'Tên giảng viên' })
-//   lecturerName?: string;
-
-//   @ApiProperty({ description: 'Thông tin học phần' })
-//   course!: CourseResponseDto;
-
-//   @ApiProperty({ description: 'Thông tin năm học' })
-//   academicYear!: AcademicYearResponseDto;
-
-//   @ApiProperty({
-//     description: 'Chi tiết lịch học',
-//     type: [DetailTimeSlotsDto],
-//   })
-//   detailTimeSlots!: DetailTimeSlotsDto[];
-
-//   @ApiPropertyOptional({ description: 'Ghi chú' })
-//   notes?: string;
-// }

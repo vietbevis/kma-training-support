@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
 import * as XLSX from 'xlsx';
 import { TimetableUploadDataDto } from './timetable.dto';
+import { DayOfWeek } from 'src/shared/enums/day-of-week.enum';
 @Injectable()
 export class ExcelParserService {
   async parseExcelFile(fileBuffer: Buffer): Promise<TimetableUploadDataDto[]> {
@@ -12,6 +12,8 @@ export class ExcelParserService {
       const allData: TimetableUploadDataDto[] = [];
 
       for (const sheetName of sheetNames) {
+
+
         const worksheet = workbook.Sheets[sheetName];
         const rawData = XLSX.utils.sheet_to_json(worksheet, {
           header: 1,
@@ -82,6 +84,9 @@ export class ExcelParserService {
           result.push(currentCourse);
         }
 
+        // get pure className
+        const pureClassName = this.getPureClassName(String(row[columnMap.className] || '').trim())
+
         currentCourse = {
           order: this.parseNumber(row[columnMap.tt]),
           courseCode,
@@ -96,7 +101,7 @@ export class ExcelParserService {
             row[columnMap.overtimeCoefficient],
           ),
           standardHours: this.parseNumber(row[columnMap.standardHours]),
-          className: String(row[columnMap.className] || '').trim(),
+          className: pureClassName,
           classType: String(row[columnMap.classType] || '').trim(),
           lecturerName: String(row[columnMap.lecturerName] || '').trim(),
           startDate: this.parseExcelDate(row[columnMap.startDate]),
@@ -195,6 +200,15 @@ export class ExcelParserService {
     return result;
   }
 
+
+  private getPureClassName(className: string): string {
+    if (!className) return "";
+
+    // Regex: tìm "-số-số" và bỏ hết từ đó trở đi
+    return className.replace(/-\d+-\d+.*$/, "").trim();
+  }
+
+
   private mapColumns(headerRow: any[]): Record<string, number> {
     const columnMap: Record<string, number> = {};
 
@@ -213,7 +227,7 @@ export class ExcelParserService {
         columnMap.studentCount = i;
       else if (header === 'll' && !header.includes('thực'))
         columnMap.theoryHours = i;
-      else if (header.includes('hs') && header.includes('lớp'))
+      else if (header.includes('hs') || header.includes('lớp đông'))
         columnMap.crowdClassCoefficient = i;
       else if (header.includes('ll thực') || header.includes('ll thuc'))
         columnMap.actualHours = i;
@@ -248,7 +262,7 @@ export class ExcelParserService {
 
   private parseNumber(value: any): number {
     if (value === null || value === undefined || value === '') {
-      return 0;
+      return 1;
     }
 
     // Nếu là string chứa công thức Excel, thử parse kết quả
