@@ -131,7 +131,6 @@ export class CreateTimetableDto {
 export class UpdateTimetableDto extends PartialType(
   OmitType(CreateTimetableDto, [
     'crowdClassCoefficient',
-    'overtimeCoefficient',
     'standardHours',
     'detailTimeSlots',
   ] as const),
