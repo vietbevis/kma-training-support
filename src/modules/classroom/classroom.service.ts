@@ -337,7 +337,7 @@ export class ClassroomService {
 
       // Chuyển đổi ngày thành thứ trong tuần (1-7)
       const queryDate = new Date(date);
-      const dayOfWeek = queryDate.getDay() === 0 ? 7 : queryDate.getDay(); // Chủ nhật = 7, thứ 2 = 1
+      const dayOfWeek = queryDate.getDay(); // Chủ nhật = 0, thứ 2 = 1
 
       // Tìm các timeslot đang được sử dụng trong ngày và ca đó
       const timeSlotQuery = this.timeSlotRepository
@@ -347,7 +347,9 @@ export class ClassroomService {
         .andWhere('timeslot.startDate <= :date AND timeslot.endDate >= :date', {
           date,
         })
-        .andWhere('timeslot.dayOfWeek = :dayOfWeek', { dayOfWeek });
+        .andWhere('timeslot.dayOfWeek = :dayOfWeek', {
+          dayOfWeek: dayOfWeek + 1,
+        });
 
       // Bắt buộc lọc theo ca học cụ thể
       timeSlotQuery.andWhere('timeslot.timeSlot = :timeSlot', { timeSlot });
