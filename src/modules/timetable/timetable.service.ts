@@ -228,6 +228,10 @@ export class TimetableService {
     const parameters: any = {};
 
     conflictChecks.forEach((check, index) => {
+      if (check.buildingName === 'Chung') {
+        return;
+      }
+
       const condition = `(
         classroom.name = :roomName${index} AND
         building.name = :buildingName${index} AND
