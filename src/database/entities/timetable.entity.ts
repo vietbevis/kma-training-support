@@ -1,13 +1,21 @@
 import { ApiHideProperty } from '@nestjs/swagger';
 import { Exclude, Type } from 'class-transformer';
 import { KyHoc } from 'src/shared/enums/semester.enum';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  Unique,
+} from 'typeorm';
 import { AuditableEntity } from '../base/auditable.entity';
 import { AcademicYearEntity } from './academic-years.entity';
 import { CourseEntity } from './course.entity';
 import { TimeSlotEntity } from './timeslot.entity';
 
 @Entity('tbl_timetables')
+@Unique(['className', 'semester', 'academicYearId'])
 export class TimetableEntity extends AuditableEntity {
   @Column({
     name: 'class_name',

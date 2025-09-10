@@ -285,7 +285,7 @@ export class TimetableService {
       skip,
       take: limit,
       order: {
-        className: 'DESC',
+        className: 'ASC',
       },
     });
 

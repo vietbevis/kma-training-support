@@ -59,8 +59,3 @@ export class TimeSlotEntity extends AuditableEntity {
   @JoinColumn({ name: 'timetable_id' })
   timetable!: TimetableEntity;
 }
-
-/**
- * Lúc phân tích mà có cả roomName và buildingName thì check trong db có phòng học đó chưa nếu chưa thì tạo mới, nếu cả toà nhà và phòng học chưa có thì tạo mới cả toà nhà và phòng học
- * Lúc phân tích mà chỉ có roomName thì mặc định check phòng học đó có trong danh sách các phòng học của toà nhà Chung chưa nếu chưa thì tạo mới
- */
