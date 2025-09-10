@@ -11,10 +11,12 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
+  BuildingClassroomAvailabilityResponseDto,
   ClassroomParamDto,
   CreateClassroomDto,
+  QueryClassroomAvailabilityDto,
   QueryClassroomDeletedDto,
   QueryClassroomDto,
   UpdateClassroomDto,
@@ -43,6 +45,23 @@ export class ClassroomController {
   @ApiOperation({ summary: 'Lấy danh sách phòng học đã xóa mềm' })
   getDeletedRecords(@Query() queryDto: QueryClassroomDeletedDto) {
     return this.classroomService.getDeletedRecords(queryDto);
+  }
+
+  @Get('availability')
+  @ApiOperation({
+    summary: 'Kiểm tra tình trạng phòng học của tòa nhà theo ngày và ca học',
+    description:
+      'Trả về danh sách tất cả phòng học của một tòa nhà trong ngày cụ thể theo ca học bắt buộc, hiển thị phòng nào trống và phòng nào đang được sử dụng.',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Thành công',
+    type: BuildingClassroomAvailabilityResponseDto,
+  })
+  async getClassroomAvailability(
+    @Query() queryDto: QueryClassroomAvailabilityDto,
+  ): Promise<BuildingClassroomAvailabilityResponseDto> {
+    return this.classroomService.getClassroomAvailability(queryDto);
   }
 
   @Get(':id')

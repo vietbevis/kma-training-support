@@ -33,6 +33,7 @@ import { CompressionMiddleware } from './shared/middlewares/compression.middlewa
 import { HelmetMiddleware } from './shared/middlewares/helmet.middleware';
 import { MorganMiddleware } from './shared/middlewares/morgan.middleware';
 import { SharedModule } from './shared/shared.module';
+import { TimeslotsModule } from './modules/timeslots/timeslots.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { SharedModule } from './shared/shared.module';
     AuthModule,
     FilesModule,
     TimetableModule,
+    TimeslotsModule,
   ],
   controllers: [AppController],
   providers: [

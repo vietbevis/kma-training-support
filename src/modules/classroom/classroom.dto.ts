@@ -2,6 +2,7 @@ import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsDateString,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -155,4 +156,90 @@ export class ClassroomParamDto {
   })
   @IsUUID()
   id: string;
+}
+
+export class QueryClassroomAvailabilityDto {
+  @ApiProperty({
+    description: 'ID tòa nhà',
+    example: '123e4567-e89b-12d3-a456-426614174000',
+  })
+  @IsUUID()
+  @IsNotEmpty()
+  buildingId: string;
+
+  @ApiProperty({
+    description: 'Ngày cần kiểm tra (YYYY-MM-DD)',
+    example: '2024-01-15',
+  })
+  @IsDateString()
+  @IsNotEmpty()
+  date: string;
+
+  @ApiProperty({
+    description: 'Ca học cần kiểm tra (ví dụ: "1-3", "4-6")',
+    example: '1-3',
+  })
+  @IsString()
+  @IsNotEmpty()
+  timeSlot: string;
+}
+
+// Response DTOs
+export class ClassroomAvailabilityResponseDto {
+  @ApiProperty({ description: 'ID phòng học' })
+  id: string;
+
+  @ApiProperty({ description: 'Tên phòng học' })
+  name: string;
+
+  @ApiProperty({ description: 'Loại phòng học' })
+  type: string;
+
+  @ApiProperty({ description: 'Mô tả phòng học', required: false })
+  description?: string;
+
+  @ApiProperty({
+    description: 'Trạng thái phòng (true: đang sử dụng, false: trống)',
+  })
+  isOccupied: boolean;
+
+  @ApiProperty({
+    description: 'Thông tin chi tiết nếu phòng đang được sử dụng',
+    required: false,
+  })
+  occupancyDetails?: {
+    timeSlot: string;
+    startDate: Date;
+    endDate: Date;
+    dayOfWeek: number;
+    timetableId: string;
+  };
+}
+
+export class BuildingClassroomAvailabilityResponseDto {
+  @ApiProperty({ description: 'Thông tin tòa nhà' })
+  building: {
+    id: string;
+    name: string;
+    description?: string;
+  };
+
+  @ApiProperty({ description: 'Ngày kiểm tra' })
+  date: string;
+
+  @ApiProperty({ description: 'Ca học kiểm tra', required: false })
+  timeSlot?: string;
+
+  @ApiProperty({
+    description: 'Danh sách phòng học và trạng thái',
+    type: [ClassroomAvailabilityResponseDto],
+  })
+  classrooms: ClassroomAvailabilityResponseDto[];
+
+  @ApiProperty({ description: 'Thống kê' })
+  summary: {
+    total: number;
+    occupied: number;
+    available: number;
+  };
 }

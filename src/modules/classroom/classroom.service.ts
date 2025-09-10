@@ -9,9 +9,13 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { BuildingEntity } from 'src/database/entities/building.entity';
 import { ClassroomEntity } from 'src/database/entities/classrooms.entity';
+import { TimeSlotEntity } from 'src/database/entities/timeslot.entity';
 import { ILike, IsNull, Not, QueryFailedError, Repository } from 'typeorm';
 import {
+  BuildingClassroomAvailabilityResponseDto,
+  ClassroomAvailabilityResponseDto,
   CreateClassroomDto,
+  QueryClassroomAvailabilityDto,
   QueryClassroomDeletedDto,
   QueryClassroomDto,
   UpdateClassroomDto,
@@ -26,6 +30,8 @@ export class ClassroomService {
     private readonly classroomRepository: Repository<ClassroomEntity>,
     @InjectRepository(BuildingEntity)
     private readonly buildingRepository: Repository<BuildingEntity>,
+    @InjectRepository(TimeSlotEntity)
+    private readonly timeSlotRepository: Repository<TimeSlotEntity>,
   ) {}
 
   async create(createClassroomDto: CreateClassroomDto) {
@@ -301,6 +307,114 @@ export class ClassroomService {
       throw new BadRequestException({
         statusCode: HttpStatus.BAD_REQUEST,
         message: 'Không thể lấy danh sách phòng học đã xóa',
+      });
+    }
+  }
+
+  async getClassroomAvailability(
+    queryDto: QueryClassroomAvailabilityDto,
+  ): Promise<BuildingClassroomAvailabilityResponseDto> {
+    try {
+      const { buildingId, date, timeSlot } = queryDto;
+
+      // Kiểm tra tòa nhà tồn tại
+      const building = await this.buildingRepository.findOne({
+        where: { id: buildingId },
+      });
+
+      if (!building) {
+        throw new NotFoundException({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: 'Không tìm thấy tòa nhà',
+        });
+      }
+
+      // Lấy tất cả phòng học của tòa nhà
+      const classrooms = await this.classroomRepository.find({
+        where: { buildingId },
+        order: { name: 'ASC' },
+      });
+
+      // Chuyển đổi ngày thành thứ trong tuần (1-7)
+      const queryDate = new Date(date);
+      const dayOfWeek = queryDate.getDay() === 0 ? 7 : queryDate.getDay(); // Chủ nhật = 7, thứ 2 = 1
+
+      // Tìm các timeslot đang được sử dụng trong ngày và ca đó
+      const timeSlotQuery = this.timeSlotRepository
+        .createQueryBuilder('timeslot')
+        .leftJoinAndSelect('timeslot.classroom', 'classroom')
+        .where('classroom.buildingId = :buildingId', { buildingId })
+        .andWhere('timeslot.startDate <= :date AND timeslot.endDate >= :date', {
+          date,
+        })
+        .andWhere('timeslot.dayOfWeek = :dayOfWeek', { dayOfWeek });
+
+      // Bắt buộc lọc theo ca học cụ thể
+      timeSlotQuery.andWhere('timeslot.timeSlot = :timeSlot', { timeSlot });
+
+      const occupiedTimeSlots = await timeSlotQuery.getMany();
+
+      // Map thông tin phòng đang được sử dụng
+      const occupiedClassroomMap = new Map<string, any>();
+      occupiedTimeSlots.forEach((slot) => {
+        if (!occupiedClassroomMap.has(slot.classroomId)) {
+          occupiedClassroomMap.set(slot.classroomId, []);
+        }
+        occupiedClassroomMap.get(slot.classroomId)!.push({
+          timeSlot: slot.timeSlot,
+          startDate: slot.startDate,
+          endDate: slot.endDate,
+          dayOfWeek: slot.dayOfWeek,
+          timetableId: slot.timetableId,
+        });
+      });
+
+      // Tạo response cho từng phòng học
+      const classroomAvailability: ClassroomAvailabilityResponseDto[] =
+        classrooms.map((classroom) => {
+          const occupancyInfo = occupiedClassroomMap.get(classroom.id);
+          const isOccupied = occupancyInfo && occupancyInfo.length > 0;
+
+          return {
+            id: classroom.id,
+            name: classroom.name,
+            type: classroom.type,
+            description: classroom.description,
+            isOccupied: !!isOccupied,
+            occupancyDetails: isOccupied ? occupancyInfo[0] : undefined, // Lấy thông tin đầu tiên nếu có nhiều
+          };
+        });
+
+      // Tính toán thống kê
+      const total = classrooms.length;
+      const occupied = classroomAvailability.filter(
+        (cr) => cr.isOccupied,
+      ).length;
+      const available = total - occupied;
+
+      return {
+        building: {
+          id: building.id,
+          name: building.name,
+          description: building.description,
+        },
+        date,
+        timeSlot,
+        classrooms: classroomAvailability,
+        summary: {
+          total,
+          occupied,
+          available,
+        },
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error('Lỗi lấy thông tin tình trạng phòng học', error);
+      throw new BadRequestException({
+        statusCode: HttpStatus.BAD_REQUEST,
+        message: 'Không thể lấy thông tin tình trạng phòng học',
       });
     }
   }
