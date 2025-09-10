@@ -34,16 +34,10 @@ export class TimetableService {
   constructor(
     @InjectRepository(TimetableEntity)
     private readonly timetableRepository: Repository<TimetableEntity>,
-    @InjectRepository(TimeSlotEntity)
-    private readonly timeSlotRepository: Repository<TimeSlotEntity>,
     @InjectRepository(CourseEntity)
     private readonly courseRepository: Repository<CourseEntity>,
     @InjectRepository(AcademicYearEntity)
     private readonly academicYearRepository: Repository<AcademicYearEntity>,
-    @InjectRepository(BuildingEntity)
-    private readonly buildingRepository: Repository<BuildingEntity>,
-    @InjectRepository(ClassroomEntity)
-    private readonly classroomRepository: Repository<ClassroomEntity>,
     private readonly dataSource: DataSource,
   ) {}
 
