@@ -269,7 +269,7 @@ export class TimetableService {
       skip,
       take: limit,
       order: {
-        createdAt: 'DESC',
+        className: 'DESC',
       },
     });
 
