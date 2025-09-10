@@ -94,6 +94,7 @@ export const ENTITY_NAME_MAPPING = Object.freeze({
 
   // Thời khóa biểu
   TimetableEntity: 'Thời khóa biểu',
+  TimeSlotEntity: 'Ca học',
 } as const);
 
 // Mapping tên fields sang tiếng Việt
@@ -239,6 +240,7 @@ export const FIELD_NAME_MAPPING = Object.freeze({
   detailTimeSlots: 'Chi tiết lịch học',
   courseId: 'Học phần',
   academicYearId: 'Năm học',
+  timeSlot: 'Ca học',
 } as const);
 
 // Mapping relation column name tới entity name
@@ -263,6 +265,7 @@ export const RELATION_COLUMN_NAME_TO_ENTITY_NAME = Object.freeze({
   headOfDepartmentId: 'UserEntity',
   scopeFacultyDepartmentId: 'FacultyDepartmentEntity',
   visitingLecturerId: 'VisitingLecturerEntity',
+  timeSlotId: 'TimeSlotEntity',
 } as const);
 
 // White list fields kết thúc bằng Id nhưng không phải relation
@@ -287,6 +290,7 @@ export const RELATION_DISPLAY_FIELDS = Object.freeze({
   RefreshTokenEntity: ['token', 'expiresAt'],
   AuditLogEntity: ['action', 'entityName', 'entityId'],
   VisitingLecturerEntity: ['fullName'],
+  TimeSlotEntity: ['timeSlot'],
 } as const);
 
 // Các relation field đặc biệt trong quan hệ 1-n hoặc n-n
@@ -301,6 +305,7 @@ export const EXCLUDED_ENTITIES = new Set([
   'AuditLogEntity', // Tránh audit chính audit log gây lặp vô hạn
   'RefreshTokenEntity', // Token thay đổi quá nhiều
   'TimetableEntity', // Thời khóa biểu thay đổi quá nhiều
+  'TimeSlotEntity', // Ca học thay đổi quá nhiều
 ]);
 
 // Danh sách fields nhạy cảm cần ẩn
