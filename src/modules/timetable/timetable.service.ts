@@ -17,6 +17,7 @@ import {
   EntityManager,
   ILike,
   In,
+  Not,
   Repository,
 } from 'typeorm';
 import {
@@ -51,6 +52,21 @@ export class TimetableService {
     manager: EntityManager,
   ): Promise<TimetableEntity> {
     const { detailTimeSlots = [], ...timetableData } = createTimetableDto;
+
+    // Check for duplicate combination of className, semester, academicYearId
+    const existingTimetable = await manager.findOne(TimetableEntity, {
+      where: {
+        className: createTimetableDto.className,
+        semester: createTimetableDto.semester,
+        academicYearId: createTimetableDto.academicYearId,
+      },
+    });
+
+    if (existingTimetable) {
+      throw new ConflictException(
+        `Thời khóa biểu đã tồn tại cho lớp "${createTimetableDto.className}" trong kì học ${createTimetableDto.semester} năm học này`,
+      );
+    }
 
     // Batch check conflicts for real rooms only
     const realRoomSlots = detailTimeSlots.filter((slot) =>
@@ -306,8 +322,42 @@ export class TimetableService {
     updateTimetableDto: UpdateTimetableDto,
   ): Promise<TimetableEntity> {
     const timetable = await this.findOne(id);
-    const { courseId, academicYearId, actualHours, studentCount, ...rest } =
-      updateTimetableDto;
+    const {
+      courseId,
+      academicYearId,
+      actualHours,
+      studentCount,
+      className,
+      semester,
+      ...rest
+    } = updateTimetableDto;
+
+    // Check for duplicate combination if className, semester, or academicYearId changes
+    if (
+      (className && className !== timetable.className) ||
+      (semester && semester !== timetable.semester) ||
+      (academicYearId && academicYearId !== timetable.academicYearId)
+    ) {
+      const duplicateCheckClassName = className || timetable.className;
+      const duplicateCheckSemester = semester || timetable.semester;
+      const duplicateCheckAcademicYearId =
+        academicYearId || timetable.academicYearId;
+
+      const existingTimetable = await this.timetableRepository.findOne({
+        where: {
+          className: duplicateCheckClassName,
+          semester: duplicateCheckSemester,
+          academicYearId: duplicateCheckAcademicYearId,
+          id: Not(id), // Exclude current timetable
+        },
+      });
+
+      if (existingTimetable) {
+        throw new ConflictException(
+          `Thời khóa biểu đã tồn tại cho lớp "${duplicateCheckClassName}" trong kì học ${duplicateCheckSemester} năm học này`,
+        );
+      }
+    }
 
     // Update crowd class coefficient if student count changes
     if (studentCount && studentCount !== timetable.studentCount) {
@@ -374,6 +424,10 @@ export class TimetableService {
         timetable.crowdClassCoefficient *
         timetable.overtimeCoefficient;
     }
+
+    // Update remaining fields
+    if (className) timetable.className = className;
+    if (semester) timetable.semester = semester;
 
     Object.assign(timetable, rest);
     return await this.timetableRepository.save(timetable);
