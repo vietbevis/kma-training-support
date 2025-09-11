@@ -36,6 +36,9 @@ export class EnvironmentValidation {
   @IsString()
   API_URL: string;
 
+  @IsString()
+  BACKUP_FOLDER_PATH: string;
+
   // Database
   @IsString()
   DB_HOST: string;
@@ -72,6 +75,9 @@ export class EnvironmentValidation {
 
   @IsString()
   MINIO_BUCKET_NAME: string;
+
+  @IsString()
+  MINIO_BACKUP_BUCKET_NAME: string;
 
   // Swagger
   @IsString()

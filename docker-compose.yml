@@ -27,7 +27,7 @@ services:
       POSTGRES_DB: kma-training-support
     # mở port 5432 ra ngoài để có thể connect từ máy host
     ports:
-      - '5433:5432'
+      - '5432:5432'
     #  gắn một thư mục (volume) để lưu dữ liệu ra ngoài container -> khi container xóa thì dữ liệu vẫn còn
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -36,9 +36,7 @@ volumes:
   pgdata:
   miniodata:
 
-
   # khi có nhiều service trong cùng một docker-compose.yml, chúng nằm chung trong một mạng nội bộ cho Docker quản lý
 
-
-  # tóm lại file này dùng để tạo môi trường các thứ cho postgres, minio 
+  # tóm lại file này dùng để tạo môi trường các thứ cho postgres, minio
   # việc còn lại là phải tự tạo cấu trúc như table, dữ liệu ...
