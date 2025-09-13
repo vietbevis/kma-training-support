@@ -14,7 +14,6 @@ import {
   ApiBody,
   ApiOperation,
   ApiParam,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -22,7 +21,6 @@ import { Response } from 'express';
 import { Public } from 'src/shared/decorators/public.decorator';
 import {
   BackupStatisticsDto,
-  BackupValidationResponseDto,
   CreateBackupDto,
   ForceCleanupResponseDto,
   QueryBackupDto,
@@ -30,9 +28,9 @@ import {
 } from './backup.dto';
 import { BackupService } from './backup.service';
 
-@Controller('backup')
 @ApiTags('Backup')
 @Public()
+@Controller('backup')
 export class BackupController {
   constructor(private readonly backupService: BackupService) {}
 
@@ -45,7 +43,6 @@ export class BackupController {
 
   @Get()
   @ApiOperation({ summary: 'Lấy danh sách backup' })
-  @ApiQuery({ type: QueryBackupDto })
   async getBackups(@Query() query: QueryBackupDto) {
     return this.backupService.getBackups(query);
   }
@@ -92,18 +89,6 @@ export class BackupController {
     return { message: 'Backup restored successfully' };
   }
 
-  @Get(':id/validate')
-  @ApiOperation({ summary: 'Validate backup integrity' })
-  @ApiParam({ name: 'id', type: String })
-  @ApiResponse({ status: 200, type: BackupValidationResponseDto })
-  async validateBackup(@Param('id') id: string) {
-    const isValid = await this.backupService.validateBackup(id);
-    return {
-      valid: isValid,
-      message: isValid ? 'Backup is valid' : 'Backup validation failed',
-    };
-  }
-
   @Get('statistics')
   @ApiOperation({ summary: 'Lấy thống kê backup' })
   @ApiResponse({ status: 200, type: BackupStatisticsDto })
@@ -119,6 +104,17 @@ export class BackupController {
     return {
       message: `Deleted ${result.deletedCount} backups`,
       deletedCount: result.deletedCount,
+      errors: result.errors,
+    };
+  }
+
+  @Post('rebuild-metadata')
+  @ApiOperation({ summary: 'Rebuild backup metadata từ files có sẵn' })
+  async rebuildMetadata() {
+    const result = await this.backupService.rebuildBackupMetadata();
+    return {
+      message: `Rebuilt ${result.rebuiltCount} backup metadata entries`,
+      rebuiltCount: result.rebuiltCount,
       errors: result.errors,
     };
   }

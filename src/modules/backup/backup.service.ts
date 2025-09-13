@@ -5,7 +5,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { InjectRepository } from '@nestjs/typeorm';
 import * as archiver from 'archiver';
 import { exec } from 'child_process';
 import * as extract from 'extract-zip';
@@ -13,12 +12,14 @@ import { createWriteStream } from 'fs';
 import * as fs from 'fs/promises';
 import { Client } from 'minio';
 import * as path from 'path';
-import { BackupEntity } from 'src/database/entities/backup.entity';
 import { InjectMinio } from 'src/shared/decorators/minio.decorator';
 import { BackupStatus, BackupType } from 'src/shared/enums/backup.enum';
 import { ConfigService } from 'src/shared/services/config.service';
-import { DataSource, ILike, MoreThan, Repository } from 'typeorm';
 import { promisify } from 'util';
+import {
+  BackupMetadata,
+  BackupMetadataService,
+} from './backup-metadata.service';
 import {
   CreateBackupDto,
   QueryBackupDto,
@@ -35,11 +36,9 @@ export class BackupService {
   private readonly backupFolderPath: string;
 
   constructor(
-    @InjectRepository(BackupEntity)
-    private backupRepository: Repository<BackupEntity>,
     @InjectMinio() private readonly minioClient: Client,
     private readonly configService: ConfigService,
-    private readonly dataSource: DataSource,
+    private readonly backupMetadataService: BackupMetadataService,
   ) {
     this.backupBucketName = this.configService.get('MINIO_BACKUP_BUCKET_NAME');
     this.mainBucketName = this.configService.get('MINIO_BUCKET_NAME');
@@ -50,14 +49,14 @@ export class BackupService {
   async createBackup(
     createBackupDto: CreateBackupDto,
     type: BackupType = BackupType.MANUAL,
-  ): Promise<BackupEntity> {
-    const backup = this.backupRepository.create({
+  ): Promise<any> {
+    // Tạo backup metadata trong file system thay vì database
+    const backup = await this.backupMetadataService.createBackup({
+      id: crypto.randomUUID(),
       ...createBackupDto,
       type,
       status: BackupStatus.PENDING,
     });
-
-    await this.backupRepository.save(backup);
 
     // Thực hiện backup bất đồng bộ
     this.performBackup(backup.id).catch((error) => {
@@ -109,55 +108,73 @@ export class BackupService {
   }
 
   private async performBackup(backupId: string): Promise<void> {
-    const backup = await this.backupRepository.findOne({
-      where: { id: backupId },
-    });
+    const backup = await this.backupMetadataService.findOne(backupId);
     if (!backup) return;
 
     try {
-      await this.backupRepository.update(backupId, {
+      await this.backupMetadataService.updateBackup(backupId, {
         status: BackupStatus.IN_PROGRESS,
       });
 
       // this.backupGateway.notifyBackupStatus(backupId, BackupStatus.IN_PROGRESS);
 
-      // 1. Backup database
-      const dbBackupPath = await this.backupDatabase();
+      // 1. Tạo folder riêng cho backup này
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupFolderName = `backup-${timestamp}`;
+      const backupFolderPath = path.join(
+        this.backupFolderPath,
+        backupFolderName,
+      );
 
-      // 2. Backup files từ MinIO
-      const filesBackupPath = await this.backupMinioFiles();
+      await fs.mkdir(backupFolderPath, { recursive: true });
+      this.logger.log(`✅ Tạo backup folder: ${backupFolderName}`);
 
-      // 3. Tạo file zip
+      // 2. Backup database
+      const dbBackupPath = await this.backupDatabase(backupFolderPath);
+
+      // 3. Backup files từ MinIO
+      const filesBackupPath = await this.backupMinioFiles(backupFolderPath);
+
+      // 4. Tạo file zip
       const zipPath = await this.createBackupArchive(
         dbBackupPath,
         filesBackupPath,
+        backupFolderPath,
       );
 
-      // 4. Upload lên MinIO
+      // 5. Upload lên MinIO
       const minioKey = await this.uploadToMinio(zipPath);
 
-      // 5. Lấy thông tin file
+      // 6. Lấy thông tin file
       const stats = await fs.stat(zipPath);
 
-      // 6. Cập nhật backup record
-      await this.backupRepository.update(backupId, {
+      // 7. Cập nhật backup record
+      await this.backupMetadataService.updateBackup(backupId, {
         status: BackupStatus.COMPLETED,
         fileSize: stats.size,
         filePath: zipPath,
         minioBucket: this.backupBucketName,
         minioObjectKey: minioKey,
         completedAt: new Date(),
+        metadata: {
+          ...backup.metadata,
+          backupFolderPath,
+          backupFolderName,
+          timestamp,
+        },
       });
 
-      // 7. Thông báo hoàn thành
+      // 8. Thông báo hoàn thành
       // this.backupGateway.notifyBackupComplete(backupId, {
       //   size: stats.size,
       //   downloadUrl: `/api/backup/${backupId}/download`,
       // });
 
-      this.logger.log(`Backup completed successfully: ${backupId}`);
+      this.logger.log(
+        `✅ Backup thành công: ${backupId} - Folder: ${backupFolderName}`,
+      );
     } catch (error) {
-      await this.backupRepository.update(backupId, {
+      await this.backupMetadataService.updateBackup(backupId, {
         status: BackupStatus.FAILED,
         errorMessage: error.message,
       });
@@ -167,10 +184,10 @@ export class BackupService {
     }
   }
 
-  private async backupDatabase(): Promise<string> {
+  private async backupDatabase(backupFolderPath: string): Promise<string> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `db-backup-${timestamp}.sql`;
-    const filepath = path.join(this.backupFolderPath, filename);
+    const filepath = path.join(backupFolderPath, filename);
 
     const dbConfig = {
       host: this.configService.get('DB_HOST'),
@@ -180,22 +197,53 @@ export class BackupService {
       database: this.configService.get('DB_NAME'),
     };
 
-    const command = `pg_dump -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} -f ${filepath}`;
+    // Exclude bảng tbl_backups để tránh việc backup metadata backup
+    const command = `pg_dump -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database}  -f ${filepath}`;
 
     await execAsync(command, {
       env: { ...process.env, PGPASSWORD: dbConfig.password },
     });
 
+    this.logger.log(`✅ Database backup thành công: ${filename}`);
     return filepath;
   }
 
   private async createBackupArchive(
     dbPath: string,
     filesPath?: string,
+    backupFolderPath?: string,
   ): Promise<string> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `backup-${timestamp}.zip`;
-    const filepath = path.join(this.backupFolderPath, filename);
+    const filepath = path.join(
+      backupFolderPath || this.backupFolderPath,
+      filename,
+    );
+
+    // Tạo metadata
+    const metadata = {
+      createdAt: new Date(),
+      databaseName: this.configService.get('DB_NAME'),
+      version: '1.0.0',
+      backupFolderPath: backupFolderPath || this.backupFolderPath,
+      files: {
+        database: path.basename(dbPath),
+        files: filesPath ? path.basename(filesPath) : null,
+      },
+    };
+
+    // Lưu metadata vào file riêng trong backup folder
+    if (backupFolderPath) {
+      const metadataFilePath = path.join(
+        backupFolderPath,
+        'backup-metadata.json',
+      );
+      await fs.writeFile(
+        metadataFilePath,
+        JSON.stringify(metadata, null, 2),
+        'utf-8',
+      );
+    }
 
     return new Promise((resolve, reject) => {
       const output = createWriteStream(filepath);
@@ -213,12 +261,7 @@ export class BackupService {
         archive.file(filesPath, { name: 'files.zip' });
       }
 
-      // Thêm metadata
-      const metadata = {
-        createdAt: new Date(),
-        databaseName: this.configService.get('DB_NAME'),
-        version: '1.0.0',
-      };
+      // Thêm metadata vào archive
       archive.append(JSON.stringify(metadata, null, 2), {
         name: 'metadata.json',
       });
@@ -238,18 +281,14 @@ export class BackupService {
   }
 
   async getBackups(query: QueryBackupDto) {
-    const { page = 1, limit = 10, search } = query;
-    const [data, total] = await this.backupRepository.findAndCount({
-      where: {
-        status: query.status,
-        type: query.type,
-        name: query.search ? ILike(`%${query.search}%`) : undefined,
-      },
-      order: {
-        createdAt: 'DESC',
-      },
-      skip: (page - 1) * limit,
-      take: limit,
+    const { page = 1, limit = 10 } = query;
+
+    const { data, total } = await this.backupMetadataService.findMany({
+      status: query.status,
+      type: query.type,
+      search: query.search,
+      page,
+      limit,
     });
 
     return {
@@ -263,8 +302,8 @@ export class BackupService {
     };
   }
 
-  async getBackupById(id: string): Promise<BackupEntity> {
-    const backup = await this.backupRepository.findOne({ where: { id } });
+  async getBackupById(id: string): Promise<BackupMetadata> {
+    const backup = await this.backupMetadataService.findOne(id);
     if (!backup) {
       throw new NotFoundException('Backup not found');
     }
@@ -286,8 +325,21 @@ export class BackupService {
       }
     }
 
-    // Xóa file local
-    if (backup.filePath) {
+    // Xóa toàn bộ backup folder nếu có
+    if (backup.metadata?.backupFolderPath) {
+      try {
+        await fs.rm(backup.metadata.backupFolderPath, {
+          recursive: true,
+          force: true,
+        });
+        this.logger.log(
+          `✅ Đã xóa backup folder: ${backup.metadata.backupFolderName}`,
+        );
+      } catch (error) {
+        this.logger.warn(`Failed to delete backup folder: ${error.message}`);
+      }
+    } else if (backup.filePath) {
+      // Fallback: xóa file backup cũ nếu không có folder path
       try {
         await fs.unlink(backup.filePath);
       } catch (error) {
@@ -295,7 +347,7 @@ export class BackupService {
       }
     }
 
-    await this.backupRepository.delete(id);
+    await this.backupMetadataService.deleteBackup(id);
   }
 
   async downloadBackup(
@@ -329,6 +381,10 @@ export class BackupService {
 
     try {
       // 1. Tải backup từ MinIO
+      if (!backup.minioObjectKey) {
+        throw new BadRequestException('Backup file not found on MinIO');
+      }
+
       const tempPath = path.join(
         this.backupFolderPath,
         `temp-restore-${backup.id}.zip`,
@@ -359,7 +415,7 @@ export class BackupService {
       }
 
       // 5. Cập nhật trạng thái
-      await this.backupRepository.update(backup.id, {
+      await this.backupMetadataService.updateBackup(backup.id, {
         status: BackupStatus.RESTORED,
       });
 
@@ -376,10 +432,10 @@ export class BackupService {
     }
   }
 
-  private async backupMinioFiles(): Promise<string> {
+  private async backupMinioFiles(backupFolderPath: string): Promise<string> {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filename = `files-backup-${timestamp}.zip`;
-    const filepath = path.join(this.backupFolderPath, filename);
+    const filepath = path.join(backupFolderPath, filename);
 
     // Lấy danh sách tất cả objects trong bucket trước
     const objectsList: any[] = [];
@@ -564,14 +620,16 @@ export class BackupService {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 
-      const oldBackups = await this.backupRepository.find({
-        where: {
-          createdAt: MoreThan(cutoffDate),
-          status: BackupStatus.COMPLETED,
-        },
+      const { data: oldBackups } = await this.backupMetadataService.findMany({
+        status: BackupStatus.COMPLETED,
       });
 
-      for (const backup of oldBackups) {
+      // Filter backups older than cutoff date
+      const filteredOldBackups = oldBackups.filter(
+        (backup) => backup.createdAt < cutoffDate,
+      );
+
+      for (const backup of filteredOldBackups) {
         try {
           await this.deleteBackup(backup.id);
           this.logger.log(`✅ Đã xóa backup cũ: ${backup.name}`);
@@ -582,124 +640,32 @@ export class BackupService {
         }
       }
 
-      this.logger.log(`✅ Đã dọn dẹp ${oldBackups.length} backup cũ`);
+      this.logger.log(`✅ Đã dọn dẹp ${filteredOldBackups.length} backup cũ`);
     } catch (error) {
       this.logger.error('❌ Lỗi khi dọn dẹp backup cũ:', error);
     }
   }
 
-  async validateBackup(id: string): Promise<boolean> {
-    try {
-      const backup = await this.getBackupById(id);
-
-      if (backup.status !== BackupStatus.COMPLETED) {
-        return false;
-      }
-
-      // Kiểm tra file tồn tại trên MinIO
-      if (backup.minioObjectKey) {
-        try {
-          await this.minioClient.statObject(
-            this.backupBucketName,
-            backup.minioObjectKey,
-          );
-        } catch (error) {
-          this.logger.error(`Backup file not found on MinIO: ${error.message}`);
-          return false;
-        }
-      }
-
-      // Tải và kiểm tra tính toàn vẹn của backup
-      const tempPath = path.join(
-        this.backupFolderPath,
-        `validate-${backup.id}.zip`,
-      );
-      await this.minioClient.fGetObject(
-        this.backupBucketName,
-        backup.minioObjectKey,
-        tempPath,
-      );
-
-      // Kiểm tra có thể giải nén được không
-      const extractDir = path.resolve(
-        path.join(this.backupFolderPath, `validate-extract-${backup.id}`),
-      );
-      await fs.mkdir(extractDir, { recursive: true });
-      await extract(tempPath, { dir: extractDir });
-
-      // Kiểm tra các file bắt buộc
-      const requiredFiles = ['database.sql', 'metadata.json'];
-      for (const file of requiredFiles) {
-        const filePath = path.join(extractDir, file);
-        await fs.access(filePath);
-      }
-
-      // Dọn dẹp
-      await fs.rm(tempPath, { force: true });
-      await fs.rm(extractDir, { recursive: true, force: true });
-
-      this.logger.log(`✅ Backup ${backup.name} validation successful`);
-      return true;
-    } catch (error) {
-      this.logger.error(`❌ Backup validation failed: ${error.message}`);
-      return false;
-    }
-  }
-
   async getBackupStatistics() {
-    const [
-      totalBackups,
-      completedBackups,
-      failedBackups,
-      pendingBackups,
-      manualBackups,
-      scheduledBackups,
-    ] = await Promise.all([
-      this.backupRepository.count(),
-      this.backupRepository.count({
-        where: { status: BackupStatus.COMPLETED },
-      }),
-      this.backupRepository.count({ where: { status: BackupStatus.FAILED } }),
-      this.backupRepository.count({ where: { status: BackupStatus.PENDING } }),
-      this.backupRepository.count({ where: { type: BackupType.MANUAL } }),
-      this.backupRepository.count({ where: { type: BackupType.SCHEDULED } }),
-    ]);
-
-    // Tính tổng dung lượng
-    const backupsWithSize = await this.backupRepository.find({
-      where: { status: BackupStatus.COMPLETED, fileSize: MoreThan(0) },
-      select: ['fileSize'],
-    });
-
-    const totalSize = backupsWithSize.reduce(
-      (sum, backup) => sum + (backup.fileSize || 0),
-      0,
-    );
-
-    // Backup gần nhất
-    const latestBackup = await this.backupRepository.findOne({
-      where: { status: BackupStatus.COMPLETED },
-      order: { completedAt: 'DESC' },
-    });
+    const statistics = await this.backupMetadataService.getStatistics();
 
     return {
       summary: {
-        totalBackups,
-        completedBackups,
-        failedBackups,
-        pendingBackups,
-        manualBackups,
-        scheduledBackups,
-        totalSize,
-        averageSize:
-          completedBackups > 0 ? Math.round(totalSize / completedBackups) : 0,
+        totalBackups: statistics.totalBackups,
+        completedBackups: statistics.completedBackups,
+        failedBackups: statistics.failedBackups,
+        pendingBackups: statistics.pendingBackups,
+        manualBackups: statistics.manualBackups,
+        scheduledBackups: statistics.scheduledBackups,
+        totalSize: statistics.totalSize,
+        averageSize: statistics.averageSize,
       },
-      latestBackup: latestBackup
+      latestBackup: statistics.latestBackup
         ? {
-            id: latestBackup.id,
-            name: latestBackup.name,
-            completedAt: latestBackup.completedAt,
-            fileSize: latestBackup.fileSize,
+            id: statistics.latestBackup.id,
+            name: statistics.latestBackup.name,
+            completedAt: statistics.latestBackup.completedAt,
+            fileSize: statistics.latestBackup.fileSize,
           }
         : null,
     };
@@ -714,9 +680,8 @@ export class BackupService {
 
     try {
       // Lấy tất cả backup completed
-      const allBackups = await this.backupRepository.find({
-        where: { status: BackupStatus.COMPLETED },
-        order: { createdAt: 'ASC' },
+      const { data: allBackups } = await this.backupMetadataService.findMany({
+        status: BackupStatus.COMPLETED,
       });
 
       for (const backup of allBackups) {
@@ -734,5 +699,14 @@ export class BackupService {
     }
 
     return { deletedCount, errors };
+  }
+
+  // Thêm phương thức để rebuild metadata từ backup files có sẵn
+  async rebuildBackupMetadata(): Promise<{
+    rebuiltCount: number;
+    errors: string[];
+  }> {
+    this.logger.log('🔄 Rebuilding backup metadata from existing files...');
+    return await this.backupMetadataService.rebuildFromBackupFiles();
   }
 }
