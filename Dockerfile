@@ -16,7 +16,7 @@ COPY --from=builder /app/.env ./
 ENV NODE_ENV=production
 RUN npm prune --production
 
-EXPOSE 4000
+EXPOSE 4000 4001
 
 # Command to run the app
 CMD ["node", "dist/main"]
