@@ -488,10 +488,10 @@ export class BackupService {
       await this.restoreMinioFiles(extractDir);
 
       // 5. Cập nhật trạng thái
-      await this.backupMetadataService.updateBackup(backup.id, {
-        status: BackupStatus.RESTORED,
-        completedAt: new Date(),
-      });
+      // await this.backupMetadataService.updateBackup(backup.id, {
+      //   status: BackupStatus.RESTORED,
+      //   completedAt: new Date(),
+      // });
 
       // Notify the user if a userId exists in metadata
       if (userId) {
@@ -1025,7 +1025,7 @@ export class BackupService {
 
       // 4. Cập nhật thông tin backup metadata
       await this.backupMetadataService.updateBackup(backup.id, {
-        status: BackupStatus.RESTORED,
+        status: BackupStatus.COMPLETED,
         minioBucket: this.backupBucketName,
         minioObjectKey: minioKey,
         fileSize: backupFile.size,
