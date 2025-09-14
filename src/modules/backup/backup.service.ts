@@ -427,10 +427,24 @@ export class BackupService {
       );
     }
 
-    // Thực hiện restore bất đồng bộ
-    this.performRestore(backup.id).catch((error) => {
+    // Thực hiện restore đồng bộ
+    try {
+      await this.performRestore(backup.id);
+    } catch (error) {
       this.logger.error(`Restore failed for ${backup.id}:`, error);
-    });
+
+      // Notify user about the error
+      if (userId) {
+        this.backupGateway.notifyBackupError(
+          userId,
+          backup.id,
+          `Lỗi khôi phục: ${error.message}`,
+        );
+      }
+
+      // Re-throw the error for the caller to handle
+      throw error;
+    }
   }
 
   private async performRestore(backupId: string): Promise<void> {
@@ -953,15 +967,18 @@ export class BackupService {
         );
       }
 
-      // Thực hiện restore bất đồng bộ
-      this.performRestoreFromUploadedFile(backup.id, backupFile).catch(
-        (error) => {
-          this.logger.error(
-            `Restore from upload failed for ${backup.id}:`,
-            error,
-          );
-        },
-      );
+      // Thực hiện restore đồng bộ
+      try {
+        await this.performRestoreFromUploadedFile(backup.id, backupFile);
+      } catch (error) {
+        this.logger.error(
+          `Restore from upload failed for ${backup.id}:`,
+          error,
+        );
+
+        // Re-throw the error for the caller to handle
+        throw error;
+      }
 
       return backup;
     } catch (error) {
