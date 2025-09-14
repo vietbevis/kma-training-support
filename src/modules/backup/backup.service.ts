@@ -648,21 +648,102 @@ export class BackupService {
 
     const env = { ...process.env, PGPASSWORD: dbConfig.password };
 
-    // Ngắt kết nối tới DB (kill các session khác)
-    const terminateCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${dbConfig.database}' AND pid <> pg_backend_pid();"`;
-    await execAsync(terminateCommand, { env });
+    try {
+      // Bước 1: Ngắt tất cả kết nối đến database target (bao gồm cả connection pools)
+      const terminateCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "
+      UPDATE pg_database SET datallowconn = 'false' WHERE datname = '${dbConfig.database}';
+      SELECT pg_terminate_backend(pid) 
+      FROM pg_stat_activity 
+      WHERE datname = '${dbConfig.database}' AND pid <> pg_backend_pid();
+    "`;
 
-    // DROP database
-    const dropCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "DROP DATABASE IF EXISTS \\"${dbConfig.database}\\";"`;
-    await execAsync(dropCommand, { env });
+      this.logger.log('Terminating database connections...');
+      await execAsync(terminateCommand, { env });
 
-    // CREATE database
-    const createCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "CREATE DATABASE \\"${dbConfig.database}\\";"`;
-    await execAsync(createCommand, { env });
+      // Bước 2: Đợi một chút để đảm bảo tất cả connections đã được terminate
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    // RESTORE database từ file dump
-    const restoreCommand = `pg_restore --verbose --host=${dbConfig.host} --port=${dbConfig.port} -U ${dbConfig.username} --format=c --dbname=${dbConfig.database} "${sqlFile}"`;
-    await execAsync(restoreCommand, { env });
+      // Bước 3: Kiểm tra lại có còn connections nào không
+      const checkConnectionsCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -t -c "
+      SELECT count(*) FROM pg_stat_activity WHERE datname = '${dbConfig.database}';
+    "`;
+
+      const connectionResult = await execAsync(checkConnectionsCommand, {
+        env,
+      });
+      const connectionCount = parseInt(connectionResult.stdout.trim());
+
+      if (connectionCount > 0) {
+        this.logger.warn(
+          `Warning: Still ${connectionCount} connections to database. Forcing termination...`,
+        );
+
+        // Force terminate với retry
+        for (let i = 0; i < 3; i++) {
+          await execAsync(terminateCommand, { env });
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          const recheckResult = await execAsync(checkConnectionsCommand, {
+            env,
+          });
+          const recheckCount = parseInt(recheckResult.stdout.trim());
+
+          if (recheckCount === 0) {
+            this.logger.log('All connections terminated successfully');
+            break;
+          }
+
+          if (i === 2) {
+            this.logger.warn(
+              'Warning: Some connections may still exist, proceeding anyway...',
+            );
+          }
+        }
+      }
+
+      // Bước 4: DROP database với FORCE option (PostgreSQL 13+)
+      this.logger.log('Dropping database...');
+      const dropCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "
+      DROP DATABASE IF EXISTS \\"${dbConfig.database}\\" WITH (FORCE);
+    "`;
+
+      try {
+        await execAsync(dropCommand, { env });
+      } catch (error) {
+        // Fallback cho PostgreSQL versions cũ hơn (không support WITH FORCE)
+        this.logger.warn('FORCE option not supported, trying without FORCE...');
+        const dropCommandFallback = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "DROP DATABASE IF EXISTS \\"${dbConfig.database}\\";`;
+        await execAsync(dropCommandFallback, { env });
+      }
+
+      // Bước 5: CREATE database mới
+      this.logger.log('Creating new database...');
+      const createCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "CREATE DATABASE \\"${dbConfig.database}\\";"`;
+      await execAsync(createCommand, { env });
+
+      // Bước 6: Enable lại connections cho database
+      const enableConnectionsCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "UPDATE pg_database SET datallowconn = 'true' WHERE datname = '${dbConfig.database}';"`;
+      await execAsync(enableConnectionsCommand, { env });
+
+      // Bước 7: RESTORE database từ file dump
+      this.logger.log('Restoring database from dump file...');
+      const restoreCommand = `pg_restore --verbose --clean --no-acl --no-owner --host=${dbConfig.host} --port=${dbConfig.port} -U ${dbConfig.username} --format=c --dbname=${dbConfig.database} "${sqlFile}"`;
+      await execAsync(restoreCommand, { env });
+
+      this.logger.log('Database restore completed successfully');
+    } catch (error) {
+      this.logger.error('Error during database restore:', error);
+
+      // Cleanup: Re-enable connections nếu có lỗi
+      try {
+        const enableConnectionsCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "UPDATE pg_database SET datallowconn = 'true' WHERE datname = '${dbConfig.database}';"`;
+        await execAsync(enableConnectionsCommand, { env });
+      } catch (cleanupError) {
+        this.logger.error('Error during cleanup:', cleanupError);
+      }
+
+      throw error;
+    }
   }
 
   // Scheduled backup - chạy hàng ngày lúc 2:00 AM
