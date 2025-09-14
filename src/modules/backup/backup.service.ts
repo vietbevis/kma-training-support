@@ -236,7 +236,7 @@ export class BackupService {
       database: this.configService.get('DB_NAME'),
     };
 
-    const command = `pg_dump --verbose --host=${dbConfig.host} --port=${dbConfig.port} -U ${dbConfig.username} --format=c --no-owner --clean --file="${filepath}" ${dbConfig.database}`;
+    const command = `pg_dump --verbose --host=${dbConfig.host} --port=${dbConfig.port} -U ${dbConfig.username} --format=c --no-owner --clean --create --file="${filepath}" ${dbConfig.database}`;
 
     await execAsync(command, {
       env: { ...process.env, PGPASSWORD: dbConfig.password },
@@ -741,7 +741,7 @@ export class BackupService {
 
       // Bước 7: RESTORE database từ file dump
       this.logger.log('Restoring database from dump file...');
-      const restoreCommand = `pg_restore --verbose --clean --no-acl --no-owner --host=${dbConfig.host} --port=${dbConfig.port} -U ${dbConfig.username} --format=c --dbname=${dbConfig.database} "${sqlFile}"`;
+      const restoreCommand = `pg_restore --verbose --host=${dbConfig.host} --port=${dbConfig.port} -U ${dbConfig.username} --format=c --dbname=${dbConfig.database} "${sqlFile}"`;
       await execAsync(restoreCommand, { env });
 
       this.logger.log('Database restore completed successfully');
