@@ -255,26 +255,12 @@ export class BackupMetadataService {
     return false;
   }
 
-  async count(
-    options: {
-      status?: BackupStatus;
-      type?: BackupType;
-    } = {},
-  ): Promise<number> {
-    const store = await this.loadMetadataStore();
-
-    return store.backups.filter((backup) => {
-      if (options.status && backup.status !== options.status) return false;
-      if (options.type && backup.type !== options.type) return false;
-      return true;
-    }).length;
-  }
-
   async getStatistics(): Promise<{
     totalBackups: number;
     completedBackups: number;
     failedBackups: number;
     pendingBackups: number;
+    restoredBackups: number;
     manualBackups: number;
     scheduledBackups: number;
     totalSize: number;
@@ -285,13 +271,20 @@ export class BackupMetadataService {
 
     const totalBackups = store.backups.length;
     const completedBackups = store.backups.filter(
-      (b) => b.status === BackupStatus.COMPLETED,
+      (b) =>
+        b.status === BackupStatus.COMPLETED ||
+        b.status === BackupStatus.RESTORED,
     ).length;
     const failedBackups = store.backups.filter(
       (b) => b.status === BackupStatus.FAILED,
     ).length;
     const pendingBackups = store.backups.filter(
-      (b) => b.status === BackupStatus.PENDING,
+      (b) =>
+        b.status === BackupStatus.PENDING ||
+        b.status === BackupStatus.IN_PROGRESS,
+    ).length;
+    const restoredBackups = store.backups.filter(
+      (b) => b.status === BackupStatus.RESTORED,
     ).length;
     const manualBackups = store.backups.filter(
       (b) => b.type === BackupType.MANUAL,
@@ -301,7 +294,12 @@ export class BackupMetadataService {
     ).length;
 
     const totalSize = store.backups
-      .filter((b) => b.status === BackupStatus.COMPLETED && b.fileSize)
+      .filter(
+        (b) =>
+          (b.status === BackupStatus.COMPLETED ||
+            b.status === BackupStatus.RESTORED) &&
+          b.fileSize,
+      )
       .reduce((sum, b) => sum + (b.fileSize || 0), 0);
 
     const averageSize =
@@ -309,7 +307,11 @@ export class BackupMetadataService {
 
     const latestBackup =
       store.backups
-        .filter((b) => b.status === BackupStatus.COMPLETED)
+        .filter(
+          (b) =>
+            b.status === BackupStatus.COMPLETED ||
+            b.status === BackupStatus.RESTORED,
+        )
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ||
       null;
 
@@ -318,6 +320,7 @@ export class BackupMetadataService {
       completedBackups,
       failedBackups,
       pendingBackups,
+      restoredBackups,
       manualBackups,
       scheduledBackups,
       totalSize,
@@ -486,47 +489,5 @@ export class BackupMetadataService {
       this.logger.error('❌ Error rebuilding backup metadata:', error);
       return { rebuiltCount: 0, errors: [error.message] };
     }
-  }
-
-  async exportToDatabase(): Promise<BackupMetadata[]> {
-    const store = await this.loadMetadataStore();
-    return store.backups;
-  }
-
-  async importFromDatabase(backups: BackupEntity[]): Promise<void> {
-    const store = await this.loadMetadataStore();
-
-    for (const backup of backups) {
-      // Check if backup already exists
-      const existingIndex = store.backups.findIndex((b) => b.id === backup.id);
-
-      const backupMetadata: BackupMetadata = {
-        id: backup.id,
-        name: backup.name,
-        description: backup.description,
-        status: backup.status,
-        type: backup.type,
-        fileSize: backup.fileSize,
-        filePath: backup.filePath,
-        minioBucket: backup.minioBucket,
-        minioObjectKey: backup.minioObjectKey,
-        errorMessage: backup.errorMessage,
-        metadata: backup.metadata,
-        createdAt: backup.createdAt,
-        updatedAt: backup.updatedAt,
-        completedAt: backup.completedAt,
-      };
-
-      if (existingIndex >= 0) {
-        store.backups[existingIndex] = backupMetadata;
-      } else {
-        store.backups.push(backupMetadata);
-      }
-    }
-
-    await this.saveMetadataStore(store);
-    this.logger.log(
-      `✅ Imported ${backups.length} backup metadata entries from database`,
-    );
   }
 }

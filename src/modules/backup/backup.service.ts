@@ -11,20 +11,19 @@ import * as extract from 'extract-zip';
 import { createWriteStream } from 'fs';
 import * as fs from 'fs/promises';
 import { Client } from 'minio';
+import { ClsService } from 'nestjs-cls';
 import * as path from 'path';
 import { InjectMinio } from 'src/shared/decorators/minio.decorator';
 import { BackupStatus, BackupType } from 'src/shared/enums/backup.enum';
+import { MyClsStore } from 'src/shared/interfaces/my-cls-store.interface';
 import { ConfigService } from 'src/shared/services/config.service';
 import { promisify } from 'util';
 import {
   BackupMetadata,
   BackupMetadataService,
 } from './backup-metadata.service';
-import {
-  CreateBackupDto,
-  QueryBackupDto,
-  RestoreBackupDto,
-} from './backup.dto';
+import { CreateBackupDto, QueryBackupDto } from './backup.dto';
+import { BackupGateway } from './backup.gateway';
 
 const execAsync = promisify(exec);
 
@@ -39,6 +38,8 @@ export class BackupService {
     @InjectMinio() private readonly minioClient: Client,
     private readonly configService: ConfigService,
     private readonly backupMetadataService: BackupMetadataService,
+    private readonly clsService: ClsService<MyClsStore>,
+    private readonly backupGateway: BackupGateway,
   ) {
     this.backupBucketName = this.configService.get('MINIO_BACKUP_BUCKET_NAME');
     this.mainBucketName = this.configService.get('MINIO_BUCKET_NAME');
@@ -47,20 +48,45 @@ export class BackupService {
   }
 
   async createBackup(
-    createBackupDto: CreateBackupDto,
+    createBackupDto: CreateBackupDto = {},
     type: BackupType = BackupType.MANUAL,
   ): Promise<any> {
     // Tạo backup metadata trong file system thay vì database
+    // Generate default values if not provided
+    const timestamp = new Date();
+    const defaultName = `Backup ${timestamp.toLocaleDateString()} ${timestamp.toLocaleTimeString()}`;
+
+    const userId = this.clsService.get('auditContext.user.id');
+
     const backup = await this.backupMetadataService.createBackup({
       id: crypto.randomUUID(),
-      ...createBackupDto,
+      name: createBackupDto.name || defaultName,
+      description: createBackupDto.description || 'System created backup',
+      metadata: {
+        ...(createBackupDto.metadata || {}),
+        userId,
+      },
       type,
       status: BackupStatus.PENDING,
     });
 
+    // Notify user that backup has been initiated
+    if (userId) {
+      this.backupGateway.notifyBackupStatus(
+        userId,
+        backup.id,
+        BackupStatus.PENDING,
+      );
+    }
+
     // Thực hiện backup bất đồng bộ
     this.performBackup(backup.id).catch((error) => {
       this.logger.error(`Backup failed for ${backup.id}:`, error);
+
+      // Notify user about the error
+      if (userId) {
+        this.backupGateway.notifyBackupError(userId, backup.id, error.message);
+      }
     });
 
     return backup;
@@ -111,12 +137,21 @@ export class BackupService {
     const backup = await this.backupMetadataService.findOne(backupId);
     if (!backup) return;
 
+    const userId = backup.metadata?.userId;
+
     try {
       await this.backupMetadataService.updateBackup(backupId, {
         status: BackupStatus.IN_PROGRESS,
       });
 
-      // this.backupGateway.notifyBackupStatus(backupId, BackupStatus.IN_PROGRESS);
+      // Notify user that backup is in progress
+      if (userId) {
+        this.backupGateway.notifyBackupStatus(
+          userId,
+          backupId,
+          BackupStatus.IN_PROGRESS,
+        );
+      }
 
       // 1. Tạo folder riêng cho backup này
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -165,10 +200,12 @@ export class BackupService {
       });
 
       // 8. Thông báo hoàn thành
-      // this.backupGateway.notifyBackupComplete(backupId, {
-      //   size: stats.size,
-      //   downloadUrl: `/api/backup/${backupId}/download`,
-      // });
+      if (userId) {
+        this.backupGateway.notifyBackupComplete(userId, backupId, {
+          size: stats.size,
+          backupId,
+        });
+      }
 
       this.logger.log(
         `✅ Backup thành công: ${backupId} - Folder: ${backupFolderName}`,
@@ -179,7 +216,9 @@ export class BackupService {
         errorMessage: error.message,
       });
 
-      // this.backupGateway.notifyBackupError(backupId, error.message);
+      if (userId) {
+        this.backupGateway.notifyBackupError(userId, backupId, error.message);
+      }
       throw error;
     }
   }
@@ -197,8 +236,7 @@ export class BackupService {
       database: this.configService.get('DB_NAME'),
     };
 
-    // Exclude bảng tbl_backups để tránh việc backup metadata backup
-    const command = `pg_dump -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database}  -f ${filepath}`;
+    const command = `pg_dump --verbose --host=${dbConfig.host} --port=${dbConfig.port} -U ${dbConfig.username} --format=c --no-owner --clean --file="${filepath}" ${dbConfig.database}`;
 
     await execAsync(command, {
       env: { ...process.env, PGPASSWORD: dbConfig.password },
@@ -372,12 +410,34 @@ export class BackupService {
     return { stream, filename };
   }
 
-  async restoreBackup(restoreDto: RestoreBackupDto): Promise<void> {
-    const backup = await this.getBackupById(restoreDto.backup_id);
+  async restoreBackup(id: string): Promise<void> {
+    const backup = await this.getBackupById(id);
+    const userId = backup.metadata?.userId;
 
-    if (backup.status !== BackupStatus.COMPLETED) {
-      throw new BadRequestException('Cannot restore incomplete backup');
+    // if (backup.status !== BackupStatus.COMPLETED) {
+    //   throw new BadRequestException('Cannot restore incomplete backup');
+    // }
+
+    // Notify user that restore has started
+    if (userId) {
+      this.backupGateway.notifyBackupStatus(
+        userId,
+        backup.id,
+        BackupStatus.IN_PROGRESS,
+      );
     }
+
+    // Thực hiện restore bất đồng bộ
+    this.performRestore(backup.id).catch((error) => {
+      this.logger.error(`Restore failed for ${backup.id}:`, error);
+    });
+  }
+
+  private async performRestore(backupId: string): Promise<void> {
+    const backup = await this.backupMetadataService.findOne(backupId);
+    if (!backup) return;
+
+    const userId = backup.metadata?.userId;
 
     try {
       // 1. Tải backup từ MinIO
@@ -395,6 +455,8 @@ export class BackupService {
         tempPath,
       );
 
+      this.logger.log(`✅ Đã tải backup từ MinIO: ${backup.minioObjectKey}`);
+
       // 2. Giải nén
       const extractDir = path.resolve(
         path.join(this.backupFolderPath, `extract-${backup.id}`),
@@ -402,32 +464,52 @@ export class BackupService {
       await fs.mkdir(extractDir, { recursive: true });
       await extract(tempPath, { dir: extractDir });
 
+      this.logger.log(`✅ Đã giải nén backup: ${extractDir}`);
+
       // 3. Restore database
       const sqlFile = path.join(extractDir, 'database.sql');
-      await this.restoreDatabase(
-        sqlFile,
-        restoreDto.restore_options?.drop_existing,
-      );
+      await this.restoreDatabase(sqlFile);
 
-      // 4. Restore files (nếu có)
-      if (restoreDto.restore_options?.restore_files !== false) {
-        await this.restoreMinioFiles(extractDir);
-      }
+      // 4. Restore files
+      await this.restoreMinioFiles(extractDir);
 
       // 5. Cập nhật trạng thái
       await this.backupMetadataService.updateBackup(backup.id, {
         status: BackupStatus.RESTORED,
+        completedAt: new Date(),
       });
+
+      // Notify the user if a userId exists in metadata
+      if (userId) {
+        this.backupGateway.notifyBackupComplete(userId, backup.id, {
+          message: 'Khôi phục thành công',
+          timestamp: new Date(),
+        });
+      }
 
       // 6. Dọn dẹp
       await fs.rm(tempPath, { force: true });
       await fs.rm(extractDir, { recursive: true, force: true });
 
       this.logger.log(
-        `Restore completed successfully for backup: ${backup.id}`,
+        `✅ Restore completed successfully for backup: ${backup.id}`,
       );
     } catch (error) {
-      this.logger.error(`Restore failed for backup ${backup.id}:`, error);
+      // Cập nhật trạng thái thất bại
+      await this.backupMetadataService.updateBackup(backup.id, {
+        status: BackupStatus.FAILED,
+        errorMessage: `Restore error: ${error.message}`,
+      });
+
+      if (userId) {
+        this.backupGateway.notifyBackupError(
+          userId,
+          backup.id,
+          `Lỗi khôi phục: ${error.message}`,
+        );
+      }
+
+      this.logger.error(`❌ Restore failed for backup ${backup.id}:`, error);
       throw error;
     }
   }
@@ -555,10 +637,7 @@ export class BackupService {
     }
   }
 
-  private async restoreDatabase(
-    sqlFile: string,
-    dropExisting: boolean = false,
-  ): Promise<void> {
+  private async restoreDatabase(sqlFile: string): Promise<void> {
     const dbConfig = {
       host: this.configService.get('DB_HOST'),
       port: this.configService.get('DB_PORT'),
@@ -569,22 +648,20 @@ export class BackupService {
 
     const env = { ...process.env, PGPASSWORD: dbConfig.password };
 
-    if (dropExisting) {
-      // Ngắt kết nối tới DB (kill các session khác)
-      const terminateCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${dbConfig.database}' AND pid <> pg_backend_pid();"`;
-      await execAsync(terminateCommand, { env });
+    // Ngắt kết nối tới DB (kill các session khác)
+    const terminateCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${dbConfig.database}' AND pid <> pg_backend_pid();"`;
+    await execAsync(terminateCommand, { env });
 
-      // DROP database
-      const dropCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "DROP DATABASE IF EXISTS \\"${dbConfig.database}\\";"`;
-      await execAsync(dropCommand, { env });
+    // DROP database
+    const dropCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "DROP DATABASE IF EXISTS \\"${dbConfig.database}\\";"`;
+    await execAsync(dropCommand, { env });
 
-      // CREATE database
-      const createCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "CREATE DATABASE \\"${dbConfig.database}\\";"`;
-      await execAsync(createCommand, { env });
-    }
+    // CREATE database
+    const createCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d postgres -c "CREATE DATABASE \\"${dbConfig.database}\\";"`;
+    await execAsync(createCommand, { env });
 
-    // Restore từ SQL file
-    const restoreCommand = `psql -h ${dbConfig.host} -p ${dbConfig.port} -U ${dbConfig.username} -d ${dbConfig.database} -f ${sqlFile}`;
+    // RESTORE database từ file dump
+    const restoreCommand = `pg_restore --verbose --host=${dbConfig.host} --port=${dbConfig.port} -U ${dbConfig.username} --format=c --dbname=${dbConfig.database} "${sqlFile}"`;
     await execAsync(restoreCommand, { env });
   }
 
@@ -655,6 +732,7 @@ export class BackupService {
         completedBackups: statistics.completedBackups,
         failedBackups: statistics.failedBackups,
         pendingBackups: statistics.pendingBackups,
+        restoredBackups: statistics.restoredBackups,
         manualBackups: statistics.manualBackups,
         scheduledBackups: statistics.scheduledBackups,
         totalSize: statistics.totalSize,
@@ -708,5 +786,303 @@ export class BackupService {
   }> {
     this.logger.log('🔄 Rebuilding backup metadata from existing files...');
     return await this.backupMetadataService.rebuildFromBackupFiles();
+  }
+
+  /**
+   * Phương thức khôi phục từ file backup được upload
+   * @param backupFile File backup được upload
+   * @param restoreDto Các tùy chọn khôi phục
+   */
+  async restoreFromUploadedFile(
+    backupFile: Express.Multer.File,
+  ): Promise<BackupMetadata> {
+    this.logger.log(`🔄 Bắt đầu khôi phục từ file backup được upload`);
+
+    // 1. Tạo thư mục tạm thời để lưu file
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const tempFolderName = `upload-restore-${timestamp}`;
+    const tempFolderPath = path.resolve(
+      path.join(this.backupFolderPath, tempFolderName),
+    );
+
+    await fs.mkdir(tempFolderPath, { recursive: true });
+
+    // 2. Lưa file backup vào thư mục tạm thời
+    const backupFilePath = path.resolve(
+      path.join(tempFolderPath, backupFile.originalname),
+    );
+    await fs.writeFile(backupFilePath, backupFile.buffer);
+
+    this.logger.log(`✅ Đã lưu file backup vào ${backupFilePath}`);
+
+    // 3. Tạo folder để giải nén
+    const extractDir = path.resolve(path.join(tempFolderPath, 'extracted'));
+    await fs.mkdir(extractDir, { recursive: true });
+
+    // 4. Giải nén file backup
+    await extract(backupFilePath, { dir: extractDir });
+    this.logger.log(`✅ Giải nén file backup thành công`);
+
+    // 5. Kiểm tra file backup có đúng định dạng không
+    try {
+      // Kiểm tra file database.sql
+      const sqlFilePath = path.resolve(path.join(extractDir, 'database.sql'));
+      await fs.access(sqlFilePath);
+
+      // Cố gắng đọc metadata nếu có
+      let metadata: any = {};
+      try {
+        const metadataPath = path.resolve(
+          path.join(extractDir, 'metadata.json'),
+        );
+        const metadataContent = await fs.readFile(metadataPath, 'utf-8');
+        metadata = JSON.parse(metadataContent);
+        this.logger.log('✅ Đọc metadata từ file backup thành công');
+      } catch (err) {
+        this.logger.warn('⚠️ Không tìm thấy metadata trong file backup');
+      }
+
+      // 6. Lưu backup vào metadata
+      const timestamp = new Date();
+      const backupName = `Uploaded Backup ${timestamp.toLocaleDateString()} ${timestamp.toLocaleTimeString()}`;
+      const userId = this.clsService.get('auditContext.user.id');
+
+      const backup = await this.backupMetadataService.createBackup({
+        id: crypto.randomUUID(),
+        name: backupName,
+        description: 'Backup uploaded for restoration',
+        status: BackupStatus.PENDING,
+        type: BackupType.MANUAL,
+        metadata: {
+          ...metadata,
+          uploaded: true,
+          uploadedAt: timestamp,
+          originalFilename: backupFile.originalname,
+          tempFolderPath,
+          userId,
+        },
+      });
+
+      // Notify user that restore from upload has started
+      if (userId) {
+        this.backupGateway.notifyBackupStatus(
+          userId,
+          backup.id,
+          BackupStatus.IN_PROGRESS,
+        );
+      }
+
+      // Thực hiện restore bất đồng bộ
+      this.performRestoreFromUploadedFile(backup.id, backupFile).catch(
+        (error) => {
+          this.logger.error(
+            `Restore from upload failed for ${backup.id}:`,
+            error,
+          );
+        },
+      );
+
+      return backup;
+    } catch (error) {
+      this.logger.error('❌ File backup không đúng định dạng:', error);
+      throw new BadRequestException(
+        'File backup không đúng định dạng hoặc bị hỏng. File phải chứa database.sql và tuân theo cấu trúc backup của hệ thống.',
+      );
+    }
+  }
+
+  private async performRestoreFromUploadedFile(
+    backupId: string,
+    backupFile: Express.Multer.File,
+  ): Promise<void> {
+    const backup = await this.backupMetadataService.findOne(backupId);
+    if (!backup) return;
+
+    const userId = backup.metadata?.userId;
+    const tempFolderPath = backup.metadata?.tempFolderPath;
+
+    try {
+      if (!tempFolderPath) {
+        throw new Error('Không tìm thấy thông tin temp folder path');
+      }
+
+      const extractDir = path.resolve(path.join(tempFolderPath, 'extracted'));
+
+      // 1. Khôi phục database
+      const sqlFilePath = path.resolve(path.join(extractDir, 'database.sql'));
+      await this.restoreDatabase(sqlFilePath);
+
+      this.logger.log(`✅ Đã khôi phục database từ uploaded backup`);
+
+      // 2. Khôi phục files nếu được yêu cầu
+      await this.restoreMinioFilesFromUpload(extractDir);
+
+      // 3. Lưu file backup vào MinIO
+      const minioKey = `backups/uploaded/${backupFile.originalname}`;
+      await this.minioClient.putObject(
+        this.backupBucketName,
+        minioKey,
+        backupFile.buffer,
+      );
+
+      // 4. Cập nhật thông tin backup metadata
+      await this.backupMetadataService.updateBackup(backup.id, {
+        status: BackupStatus.RESTORED,
+        minioBucket: this.backupBucketName,
+        minioObjectKey: minioKey,
+        fileSize: backupFile.size,
+        completedAt: new Date(),
+      });
+
+      // 5. Notify user về thành công
+      if (userId) {
+        this.backupGateway.notifyBackupComplete(userId, backup.id, {
+          message: 'Khôi phục từ file upload thành công',
+          timestamp: new Date(),
+        });
+      }
+
+      // 6. Dọn dẹp temp folder (tùy chọn, có thể giữ lại để debug)
+      try {
+        await fs.rm(tempFolderPath, { recursive: true, force: true });
+        this.logger.log(`✅ Đã dọn dẹp temp folder: ${tempFolderPath}`);
+      } catch (cleanupError) {
+        this.logger.warn(
+          `⚠️ Không thể dọn dẹp temp folder: ${cleanupError.message}`,
+        );
+      }
+
+      this.logger.log(
+        `✅ Khôi phục từ file backup thành công, ID: ${backup.id}`,
+      );
+    } catch (error) {
+      // Cập nhật trạng thái thất bại
+      await this.backupMetadataService.updateBackup(backup.id, {
+        status: BackupStatus.FAILED,
+        errorMessage: `Restore from upload error: ${error.message}`,
+      });
+
+      // Notify user về lỗi
+      if (userId) {
+        this.backupGateway.notifyBackupError(
+          userId,
+          backup.id,
+          `Lỗi khôi phục từ file upload: ${error.message}`,
+        );
+      }
+
+      this.logger.error(`❌ Khôi phục từ file backup thất bại:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Phương thức khôi phục files từ backup được upload
+   */
+  private async restoreMinioFilesFromUpload(extractDir: string): Promise<void> {
+    const filesZipPath = path.resolve(path.join(extractDir, 'files.zip'));
+
+    try {
+      // Kiểm tra có file backup files không
+      await fs.access(filesZipPath);
+
+      // Tạo thư mục đích và giải nén files backup
+      const filesExtractDir = path.resolve(path.join(extractDir, 'files'));
+      await fs.mkdir(filesExtractDir, { recursive: true });
+      await extract(filesZipPath, { dir: filesExtractDir });
+
+      // Đọc metadata nếu có
+      try {
+        const metadataPath = path.resolve(
+          path.join(filesExtractDir, 'files-metadata.json'),
+        );
+        const metadataContent = await fs.readFile(metadataPath, 'utf-8');
+        const metadata = JSON.parse(metadataContent);
+
+        this.logger.log(
+          `Restoring ${metadata.totalFiles || 'unknown number of'} files to MinIO`,
+        );
+
+        // Nếu có metadata, restore theo metadata
+        if (metadata.files && Array.isArray(metadata.files)) {
+          for (const fileInfo of metadata.files) {
+            try {
+              const localFilePath = path.resolve(
+                path.join(filesExtractDir, fileInfo.name),
+              );
+
+              // Kiểm tra file có tồn tại không
+              await fs.access(localFilePath);
+
+              // Upload lại vào MinIO
+              await this.minioClient.fPutObject(
+                this.mainBucketName,
+                fileInfo.name,
+                localFilePath,
+              );
+
+              this.logger.log(`Restored file: ${fileInfo.name}`);
+            } catch (error) {
+              this.logger.warn(
+                `Failed to restore file ${fileInfo.name}: ${error.message}`,
+              );
+            }
+          }
+        } else {
+          // Không có danh sách files cụ thể, restore tất cả
+          await this.restoreAllFilesInDirectory(filesExtractDir);
+        }
+      } catch (error) {
+        // Không có metadata, restore tất cả files trong thư mục
+        this.logger.warn('No files metadata found, restoring all files');
+        await this.restoreAllFilesInDirectory(filesExtractDir);
+      }
+
+      this.logger.log('✅ Files restoration completed');
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        this.logger.warn('No files backup found in uploaded backup');
+      } else {
+        this.logger.error('Error restoring files:', error);
+      }
+    }
+  }
+
+  /**
+   * Khôi phục tất cả các files trong một thư mục lên MinIO
+   */
+  private async restoreAllFilesInDirectory(directory: string): Promise<void> {
+    const processDirectory = async (dir: string, baseDir: string) => {
+      const items = await fs.readdir(dir);
+
+      for (const item of items) {
+        const fullPath = path.join(dir, item);
+        const stats = await fs.stat(fullPath);
+
+        if (stats.isDirectory()) {
+          await processDirectory(fullPath, baseDir);
+        } else {
+          // Tính toán path tương đối so với baseDir
+          const relativePath = path.relative(baseDir, fullPath);
+          // Chuyển đổi Windows path separator (\ sang /) nếu cần
+          const objectKey = relativePath.replace(/\\/g, '/');
+
+          try {
+            await this.minioClient.fPutObject(
+              this.mainBucketName,
+              objectKey,
+              fullPath,
+            );
+            this.logger.log(`Restored file: ${objectKey}`);
+          } catch (error) {
+            this.logger.warn(
+              `Failed to restore file ${objectKey}: ${error.message}`,
+            );
+          }
+        }
+      }
+    };
+
+    await processDirectory(directory, directory);
   }
 }

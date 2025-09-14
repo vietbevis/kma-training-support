@@ -3,8 +3,10 @@ import { IsEnum, IsObject, IsOptional, IsString } from 'class-validator';
 import { BackupStatus, BackupType } from 'src/shared/enums/backup.enum';
 
 export class CreateBackupDto {
+  // All fields are optional now
+  @IsOptional()
   @IsString()
-  name: string;
+  name?: string;
 
   @IsOptional()
   @IsString()
@@ -13,6 +15,16 @@ export class CreateBackupDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, any>;
+}
+
+export class RestoreFromUploadDto {
+  // No name, description, or metadata required
+  // Simplifying to just restore options
+  @IsOptional()
+  restoreOptions?: {
+    dropExisting?: boolean;
+    restoreFiles?: boolean;
+  };
 }
 
 export class CreateBackupScheduleDto {
@@ -24,17 +36,17 @@ export class CreateBackupScheduleDto {
   description?: string;
 
   @IsString()
-  cron_expression: string;
+  cronExpression: string;
 
   @IsOptional()
-  retention_days?: number;
+  retentionDays?: number;
 
   @IsOptional()
   @IsObject()
-  backup_options?: {
-    include_files?: boolean;
+  backupOptions?: {
+    includeFiles?: boolean;
     compress?: boolean;
-    exclude_tables?: string[];
+    excludeTables?: string[];
   };
 }
 
@@ -42,19 +54,12 @@ export class UpdateBackupScheduleDto extends PartialType(
   CreateBackupScheduleDto,
 ) {
   @IsOptional()
-  is_active?: boolean;
+  isActive?: boolean;
 }
 
 export class RestoreBackupDto {
   @IsString()
-  backup_id: string;
-
-  @IsOptional()
-  @IsObject()
-  restore_options?: {
-    drop_existing?: boolean;
-    restore_files?: boolean;
-  };
+  backupId: string;
 }
 
 export class QueryBackupDto {
@@ -88,6 +93,7 @@ export class BackupStatisticsDto {
     completedBackups: number;
     failedBackups: number;
     pendingBackups: number;
+    restoredBackups: number;
     manualBackups: number;
     scheduledBackups: number;
     totalSize: number;
