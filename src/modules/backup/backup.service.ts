@@ -236,7 +236,7 @@ export class BackupService {
       database: this.configService.get('DB_NAME'),
     };
 
-    const command = `pg_dump --verbose --host=${dbConfig.host} --port=${dbConfig.port} -U ${dbConfig.username} --format=c --no-owner --clean --create --file="${filepath}" ${dbConfig.database}`;
+    const command = `pg_dump --verbose --host=${dbConfig.host} --port=${dbConfig.port} -U ${dbConfig.username} --format=c --no-acl --no-owner --clean --create --file="${filepath}" ${dbConfig.database}`;
 
     await execAsync(command, {
       env: { ...process.env, PGPASSWORD: dbConfig.password },
