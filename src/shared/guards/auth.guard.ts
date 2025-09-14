@@ -1,9 +1,4 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { ClsService } from 'nestjs-cls';
 import { AuditContext } from 'src/modules/audit-log/subscribers/audit-log.subscriber';
 import { MyClsStore } from '../interfaces/my-cls-store.interface';
@@ -11,8 +6,6 @@ import { IRequest } from '../types';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  private readonly logger = new Logger(AuthGuard.name);
-
   constructor(private readonly cls: ClsService<MyClsStore>) {}
 
   canActivate(context: ExecutionContext): boolean {

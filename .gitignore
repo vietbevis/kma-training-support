@@ -4,6 +4,9 @@
 /build
 
 /keys
+/backup
+/backups
+/backup/*
 
 # Logs
 logs

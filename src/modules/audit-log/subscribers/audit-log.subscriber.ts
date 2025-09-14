@@ -306,6 +306,7 @@ export const EXCLUDED_ENTITIES = new Set([
   'RefreshTokenEntity', // Token thay đổi quá nhiều
   'TimetableEntity', // Thời khóa biểu thay đổi quá nhiều
   'TimeSlotEntity', // Ca học thay đổi quá nhiều
+  'BackupEntity', // Backup thay đổi quá nhiều
 ]);
 
 // Danh sách fields nhạy cảm cần ẩn

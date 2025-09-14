@@ -34,6 +34,8 @@ import { HelmetMiddleware } from './shared/middlewares/helmet.middleware';
 import { MorganMiddleware } from './shared/middlewares/morgan.middleware';
 import { SharedModule } from './shared/shared.module';
 import { TimeslotsModule } from './modules/timeslots/timeslots.module';
+import { BackupModule } from './modules/backup/backup.module';
+import { WebsocketModule } from './modules/websocket/websocket.module';
 
 @Module({
   imports: [
@@ -68,6 +70,8 @@ import { TimeslotsModule } from './modules/timeslots/timeslots.module';
     FilesModule,
     TimetableModule,
     TimeslotsModule,
+    BackupModule,
+    WebsocketModule,
   ],
   controllers: [AppController],
   providers: [

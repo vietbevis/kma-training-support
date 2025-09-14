@@ -4,6 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { corsConfig } from './configs/cors.config';
 import { configSwagger } from './configs/swagger.config';
+import { WebsocketAdapter } from './modules/websocket/websocket.adapter';
 import { ConfigService } from './shared/services/config.service';
 
 async function bootstrap() {
@@ -27,7 +28,11 @@ async function bootstrap() {
   });
 
   // Setup CORS
-  app.enableCors(corsConfig(configService));
+  const corsCfg = corsConfig(configService);
+  app.enableCors(corsCfg);
+
+  // Setup Websocket
+  app.useWebSocketAdapter(new WebsocketAdapter(app, configService, corsCfg));
 
   // Setup Swagger
   const { swaggerEnabled, swaggerUrl } = configSwagger(app, configService);
