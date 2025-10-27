@@ -36,6 +36,7 @@ import { SharedModule } from './shared/shared.module';
 import { TimeslotsModule } from './modules/timeslots/timeslots.module';
 import { BackupModule } from './modules/backup/backup.module';
 import { WebsocketModule } from './modules/websocket/websocket.module';
+import { StandardModule } from './modules/standard/standard.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { WebsocketModule } from './modules/websocket/websocket.module';
     TimeslotsModule,
     BackupModule,
     WebsocketModule,
+    StandardModule,
   ],
   controllers: [AppController],
   providers: [
