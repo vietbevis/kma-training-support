@@ -124,8 +124,9 @@ export class BackupService {
         this.mainBucketName,
       );
       if (!mainBucketExists) {
-        this.logger.warn(
-          `⚠️ Main bucket "${this.mainBucketName}" không tồn tại`,
+        await this.minioClient.makeBucket(this.mainBucketName, 'us-east-1');
+        this.logger.log(
+          `✅ Main bucket "${this.mainBucketName}" đã được tạo thành công`,
         );
       }
     } catch (error) {

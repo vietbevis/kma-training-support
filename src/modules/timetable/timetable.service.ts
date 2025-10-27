@@ -125,7 +125,10 @@ export class TimetableService {
 
     // Prepare buildings and classrooms to insert
     const buildingsToInsert: BuildingEntity[] = [];
-    const classroomsToInsert: ClassroomEntity[] = [];
+    const newClassroomsPerBuilding: Array<{
+      buildingName: string;
+      roomNames: string[];
+    }> = [];
 
     for (const [buildingName, roomNames] of buildingClassroomMap) {
       let building = buildingMap.get(buildingName);
@@ -140,32 +143,50 @@ export class TimetableService {
         (building.classrooms || []).map((c) => c.name),
       );
 
+      const newRoomNames: string[] = [];
       for (const roomName of roomNames) {
         if (!existingRoomNames.has(roomName)) {
-          const classroom = manager.create(ClassroomEntity, {
-            name: roomName,
-            type: buildingName === 'Chung' ? roomName : 'Phòng học',
-            building: building,
-          });
-          classroomsToInsert.push(classroom);
-
-          if (!building.classrooms) {
-            building.classrooms = [];
-          }
-          building.classrooms.push(classroom);
+          newRoomNames.push(roomName);
         }
+      }
+
+      if (newRoomNames.length > 0) {
+        newClassroomsPerBuilding.push({
+          buildingName,
+          roomNames: newRoomNames,
+        });
       }
 
       buildingMap.set(buildingName, building);
     }
 
-    // Batch insert new buildings and classrooms
+    // First, batch insert new buildings to get their IDs
     if (buildingsToInsert.length > 0) {
       const savedBuildings = await manager.save(
         BuildingEntity,
         buildingsToInsert,
       );
       savedBuildings.forEach((b) => buildingMap.set(b.name, b));
+    }
+
+    // Now create and insert classrooms with proper building IDs
+    const classroomsToInsert: ClassroomEntity[] = [];
+    for (const { buildingName, roomNames } of newClassroomsPerBuilding) {
+      const building = buildingMap.get(buildingName)!;
+
+      for (const roomName of roomNames) {
+        const classroom = manager.create(ClassroomEntity, {
+          name: roomName,
+          type: buildingName === 'Chung' ? roomName : 'Phòng học',
+          buildingId: building.id,
+        });
+        classroomsToInsert.push(classroom);
+
+        if (!building.classrooms) {
+          building.classrooms = [];
+        }
+        building.classrooms.push(classroom);
+      }
     }
 
     if (classroomsToInsert.length > 0) {

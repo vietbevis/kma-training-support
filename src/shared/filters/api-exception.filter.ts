@@ -19,11 +19,13 @@ export class ApiExceptionFilter implements ExceptionFilter {
     Logger.error(apiResponse);
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    response.status(exception.getStatus()).json(apiResponse);
+    response
+      .status(exception?.getStatus() ?? HttpStatus.INTERNAL_SERVER_ERROR)
+      .json(apiResponse);
   }
 
   static handleException(exception: HttpException) {
-    const message = exception.message ?? 'Lỗi không xác định';
+    const message = exception?.message ?? 'Lỗi không xác định';
 
     let responseDto = {
       message,
@@ -31,10 +33,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
     };
 
     const exceptionResponse =
-      exception instanceof HttpException ? exception.getResponse() : null;
+      exception instanceof HttpException ? exception?.getResponse() : null;
 
     if (typeof exceptionResponse === 'object') {
-      if (exception.getStatus() === HttpStatus.UNPROCESSABLE_ENTITY) {
+      if (exception?.getStatus() === HttpStatus.UNPROCESSABLE_ENTITY) {
         responseDto = {
           ...responseDto,
           ...exceptionResponse,

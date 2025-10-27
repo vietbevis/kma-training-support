@@ -18,7 +18,7 @@ services:
 
   db:
     # dùng image sẵn trên Docker Hub
-    image: postgres:latest
+    image: postgres:16
     restart: always
     # tạo user, password, database mặc định
     environment:
