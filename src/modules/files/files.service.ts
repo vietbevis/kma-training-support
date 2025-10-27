@@ -132,28 +132,11 @@ export class FilesService {
       if (!user) {
         throw new BadRequestException('Không tìm thấy thông tin người dùng');
       }
-
-      // Tạo tên folder từ tên khoa/phòng ban và tên nhân viên
-      const departmentName = this.sanitizeFolderName(
-        user.facultyDepartment.name,
-      );
-      const userName = this.sanitizeFolderName(user.fullName);
-
-      return `${departmentName}/${userName}`;
+      return `${user.facultyDepartment.name}/${user.fullName}`;
     } catch (error) {
       this.logger.error('❌ Lỗi khi tạo đường dẫn folder:', error);
       throw new BadRequestException('Không thể tạo đường dẫn folder');
     }
-  }
-
-  private sanitizeFolderName(name: string): string {
-    // Loại bỏ các ký tự đặc biệt và thay thế bằng dấu gạch ngang
-    return name
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Loại bỏ dấu
-      .replace(/[^a-zA-Z0-9\s]/g, '') // Loại bỏ ký tự đặc biệt
-      .replace(/\s+/g, '-') // Thay thế khoảng trắng bằng dấu gạch ngang
-      .toLowerCase();
   }
 
   private async uploadToMinio(
