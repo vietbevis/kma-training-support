@@ -131,7 +131,7 @@ export class TimetableEntity extends AuditableEntity {
   courseId!: string;
 
   @Type(() => CourseEntity)
-  @ManyToOne(() => CourseEntity, { eager: true })
+  @ManyToOne(() => CourseEntity)
   @JoinColumn({ name: 'course_id' })
   course!: CourseEntity;
 
