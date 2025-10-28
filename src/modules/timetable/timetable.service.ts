@@ -277,7 +277,9 @@ export class TimetableService {
             : undefined,
       },
       relations: {
-        course: true,
+        course: {
+          facultyDepartment: true,
+        },
         academicYear: true,
       },
       skip,
