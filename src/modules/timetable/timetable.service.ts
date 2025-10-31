@@ -298,7 +298,9 @@ export class TimetableService {
             : undefined,
       },
       relations: {
-        course: true,
+        course: {
+          facultyDepartment: true,
+        },
         academicYear: true,
       },
       skip,
@@ -517,7 +519,9 @@ export class TimetableService {
           if (!course) {
             course = manager.create(CourseEntity, {
               courseCode: item.courseCode,
-              courseName: item.className.replace(/-\d+-\d+.*$/, '').trim(),
+              courseName: item.className
+                .replace(/(-\d+-\d+.*|\(.*)$/, '')
+                .trim(),
               credits: item.credits,
               semester,
             });

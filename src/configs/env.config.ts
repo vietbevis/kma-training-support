@@ -37,6 +37,9 @@ export class EnvironmentValidation {
   API_URL: string;
 
   @IsString()
+  CLIENT_URL: string;
+
+  @IsString()
   BACKUP_FOLDER_PATH: string;
 
   // Database
