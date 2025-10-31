@@ -128,20 +128,26 @@ export class CreateStandardDto {
 
   // ========== THÊM 2 TRƯỜNG MỚI ==========
   @ApiPropertyOptional({
-    description: 'Tiêu đề section',
-    example: 'I. Các học phần thuộc Khoa CB'
-  })
-  @IsOptional()
-  @IsString()
-  sectionTitle?: string;
-
-  @ApiPropertyOptional({
-    description: 'Tên khoa/bộ môn',
+    description: 'Tên khoa/bộ môn được parse từ sectionTitle',
     example: 'Khoa CB'
   })
   @IsOptional()
   @IsString()
   department?: string;
+
+  @ApiPropertyOptional({
+    description: 'Ghi chú',
+    example: 'Ghi chú'
+  })
+  
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  // @ApiProperty({ description: 'Kỳ học' })
+  // @IsString()
+  // semester!: string;
+
   // ========================================
 }
 
@@ -299,7 +305,7 @@ export class StandardUploadDataDto {
     description: 'Ghi chú',
     example: 'Ghi chú'
   })
-  
+
   @IsOptional()
   @IsString()
   note?: string;

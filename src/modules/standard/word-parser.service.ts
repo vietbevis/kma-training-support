@@ -23,15 +23,13 @@ export class StandardWordParserService {
     // Lấy tất cả các bảng
     const tables = document.querySelectorAll('table');
 
-    console.log('First 1000 chars:', html.substring(400, 450));
+    // console.log('First 1000 chars:', html.substring(400, 450));
 
-    const text = "p học phần thuộc học kỳ 2, năm học 2024 – 2025</st";
-
+    //Lấy chuỗi có kì học và năm học
+    const text = html.substring(400, 450);
     // Regex tìm "học kỳ <số>" và "năm học <năm> – <năm>"
     const regex = /học kỳ\s*(\d+).*?năm học\s*(\d{4})\s*[–-]\s*(\d{4})/i;
-
     const match = text.match(regex);
- 
     // console.log("match@@@@@@@@", );
 
     if (tables.length === 0) {
