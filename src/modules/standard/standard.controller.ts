@@ -65,14 +65,14 @@ export class StandardController {
     schema: {
       type: 'object',
       properties: {
-        File: {
+        file: {
           type: 'string',
           format: 'binary',
         },
       },
     },
   })
-  @UseInterceptors(FileInterceptor('File'))
+  @UseInterceptors(FileInterceptor('file'))
   async uploadWord(
     @UploadedFile(
       new ParseFilePipe({
@@ -82,7 +82,7 @@ export class StandardController {
         ],
       }),
     )
-    file: Express.Multer.File
+    file: Express.Multer.File,
   ) {
     // Parse Word file and convert to DTO
     const wordData = await this.wordParserService.parseWordFile(file.buffer);

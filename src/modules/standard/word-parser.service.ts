@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import * as mammoth from 'mammoth';
 import { JSDOM } from 'jsdom';
+import * as mammoth from 'mammoth';
 import { StandardUploadDataDto } from './standard.dto';
 
 @Injectable()
@@ -23,14 +23,11 @@ export class StandardWordParserService {
     // Lấy tất cả các bảng
     const tables = document.querySelectorAll('table');
 
-    // console.log('First 1000 chars:', html.substring(400, 450));
-
     //Lấy chuỗi có kì học và năm học
     const text = html.substring(400, 450);
     // Regex tìm "học kỳ <số>" và "năm học <năm> – <năm>"
     const regex = /học kỳ\s*(\d+).*?năm học\s*(\d{4})\s*[–-]\s*(\d{4})/i;
     const match = text.match(regex);
-    // console.log("match@@@@@@@@", );
 
     if (tables.length === 0) {
       throw new Error('Không tìm thấy bảng trong file Word');
@@ -67,16 +64,23 @@ export class StandardWordParserService {
         console.error('Không thể tìm header row. Cấu trúc 15 dòng đầu:');
         for (let i = 0; i < Math.min(15, rows.length); i++) {
           const cells = rows[i].querySelectorAll('td, th');
-          const texts = Array.from(cells).map(c => c.textContent?.trim());
-          console.log(`Dòng ${i}: ${cells.length} cột -`, texts.slice(0, 5).join(' | '));
+          const texts = Array.from(cells).map((c) => c.textContent?.trim());
+          console.log(
+            `Dòng ${i}: ${cells.length} cột -`,
+            texts.slice(0, 5).join(' | '),
+          );
         }
         throw new Error('Không tìm thấy header trong bảng');
       }
     }
 
     // Map columns
-    const headerCells = Array.from(rows[headerRowIndex].querySelectorAll('td, th'));
-    const headerTexts = headerCells.map(cell => cell.textContent?.trim() || '');
+    const headerCells = Array.from(
+      rows[headerRowIndex].querySelectorAll('td, th'),
+    );
+    const headerTexts = headerCells.map(
+      (cell) => cell.textContent?.trim() || '',
+    );
     const columnMap = this.mapColumns(headerTexts);
 
     let currentCourse: StandardUploadDataDto | null = null;
@@ -90,7 +94,7 @@ export class StandardWordParserService {
 
       if (cells.length === 0) continue;
 
-      const rowData = cells.map(cell => cell.textContent?.trim() || '');
+      const rowData = cells.map((cell) => cell.textContent?.trim() || '');
       const fullRowText = rowData.join(' ').trim();
 
       // Skip empty rows
@@ -100,7 +104,7 @@ export class StandardWordParserService {
       const sectionMatch = fullRowText.match(/^([IVX]+)\.\s*(.+)/);
       if (sectionMatch) {
         currentSection = fullRowText;
-        const deptMatch = fullRowText.match(/Khoa\s+([A-ZĐÁÀẢÃẠÂẤẦẨẪẬĂẮẰẲẴẶÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴ&\s]+)/i);
+        const deptMatch = fullRowText.match(/Khoa\s+([\p{L}&\s]+)/iu);
         if (deptMatch) {
           currentDepartment = `${deptMatch[1].trim()}`;
         } else {
@@ -119,7 +123,9 @@ export class StandardWordParserService {
       }
 
       const className = this.cleanText(rowData[columnMap.className] || '');
-      const lecturerName = this.cleanText(rowData[columnMap.lecturerName] || '');
+      const lecturerName = this.cleanText(
+        rowData[columnMap.lecturerName] || '',
+      );
 
       // Chỉ tạo course mới nếu có className
       if (className && className.length > 3) {
@@ -127,25 +133,38 @@ export class StandardWordParserService {
           result.push(currentCourse);
           processedCount++;
         }
+
+        const credits = this.parseNumber(rowData[columnMap.credits]);
+        const studentCount = this.parseNumber(rowData[columnMap.studentCount]);
+        const theoryHours = this.parseNumber(rowData[columnMap.theoryHours]);
+        const actualHours = this.parseNumber(rowData[columnMap.actualHours]);
+        const overtimeCoefficient = this.parseNumber(
+          rowData[columnMap.overtimeCoefficient],
+        );
+        const crowdClassCoefficient = this.parseNumber(
+          rowData[columnMap.crowdClassCoefficient],
+        );
+        const standardHours = this.parseNumber(
+          rowData[columnMap.standardHours],
+        );
+
         currentCourse = {
-          credits: this.parseNumber(rowData[columnMap.credits]),
           className: this.getPureClassName(className),
-          semester: match ? `Học kỳ ${match[1]}` : "",
-          academicYearId: match ? `${match[2]}-${match[3]}` : "undefined",
-          lecturerName: lecturerName || '',
-          studentCount: this.parseNumber(rowData[columnMap.studentCount]),
-          theoryHours: this.parseNumber(rowData[columnMap.theoryHours]),
-          actualHours: this.parseNumber(rowData[columnMap.actualHours]),
-          overtimeCoefficient: this.parseNumber(rowData[columnMap.overtimeCoefficient]),
-          crowdClassCoefficient: this.parseNumber(rowData[columnMap.crowdClassCoefficient]),
-          standardHours: this.parseNumber(rowData[columnMap.standardHours]),
-          courseCode: '',
-          classType: '',
-          startDate: '',
-          endDate: '',
-          detailTimeSlots: [],
-          department: currentDepartment,
-          note: rowData[columnMap.note],
+          semester: match ? `Học kỳ ${match[1]}` : undefined,
+          academicYearId: match ? `${match[2]}-${match[3]}` : undefined,
+          lecturerName: lecturerName || undefined,
+          department: currentDepartment || undefined,
+          note: rowData[columnMap.note] || undefined,
+          // Only include numeric fields if they have values
+          credits: credits > 0 ? credits : undefined,
+          studentCount: studentCount > 0 ? studentCount : undefined,
+          theoryHours: theoryHours > 0 ? theoryHours : undefined,
+          actualHours: actualHours > 0 ? actualHours : undefined,
+          overtimeCoefficient:
+            overtimeCoefficient > 0 ? overtimeCoefficient : undefined,
+          crowdClassCoefficient:
+            crowdClassCoefficient > 0 ? crowdClassCoefficient : undefined,
+          standardHours: standardHours > 0 ? standardHours : undefined,
         };
       }
     }
@@ -163,25 +182,68 @@ export class StandardWordParserService {
       const header = this.cleanText(headerRow[i]).toLowerCase();
 
       // Flexible matching với nhiều từ khóa
-      if (header.includes('số tc') || header.includes('so tc') || header.includes('tín chỉ') || header.includes('tin chi'))
+      if (
+        header.includes('số tc') ||
+        header.includes('so tc') ||
+        header.includes('tín chỉ') ||
+        header.includes('tin chi')
+      )
         columnMap.credits = i;
-      else if (header.includes('lớp học phần') || header.includes('lop hoc phan') || header.includes('tên lớp'))
+      else if (
+        header.includes('lớp học phần') ||
+        header.includes('lop hoc phan') ||
+        header.includes('tên lớp')
+      )
         columnMap.className = i;
-      else if (header.includes('giáo viên') || header.includes('giao vien') || header.includes('giảng viên') || header.includes('gv'))
+      else if (
+        header.includes('giáo viên') ||
+        header.includes('giao vien') ||
+        header.includes('giảng viên') ||
+        header.includes('gv')
+      )
         columnMap.lecturerName = i;
-      else if ((header.includes('số') || header.includes('so')) && header.includes('sv'))
+      else if (
+        (header.includes('số') || header.includes('so')) &&
+        header.includes('sv')
+      )
         columnMap.studentCount = i;
-      else if (header.includes('số tiết theo') || header.includes('so tiet theo') || header.includes('ctđt') || header.includes('ctdt'))
+      else if (
+        header.includes('số tiết theo') ||
+        header.includes('so tiet theo') ||
+        header.includes('ctđt') ||
+        header.includes('ctdt')
+      )
         columnMap.theoryHours = i;
-      else if (header.includes('số tiết lên') || header.includes('so tiet len') || (header.includes('tiết') && header.includes('lên lớp')))
+      else if (
+        header.includes('số tiết lên') ||
+        header.includes('so tiet len') ||
+        (header.includes('tiết') && header.includes('lên lớp'))
+      )
         columnMap.actualHours = i;
-      else if (header.includes('hệ số lên') || header.includes('he so len') || (header.includes('ngoài') && header.includes('giờ')))
+      else if (
+        header.includes('hệ số lên') ||
+        header.includes('he so len') ||
+        (header.includes('ngoài') && header.includes('giờ'))
+      )
         columnMap.overtimeCoefficient = i;
-      else if (header.includes('hệ số lớp') || header.includes('he so lop') || header.includes('lớp đông') || header.includes('lop dong'))
+      else if (
+        header.includes('hệ số lớp') ||
+        header.includes('he so lop') ||
+        header.includes('lớp đông') ||
+        header.includes('lop dong')
+      )
         columnMap.crowdClassCoefficient = i;
-      else if (header.includes('quy chuẩn') || header.includes('quy chuan') || header === 'qc')
+      else if (
+        header.includes('quy chuẩn') ||
+        header.includes('quy chuan') ||
+        header === 'qc'
+      )
         columnMap.standardHours = i;
-      else if (header.includes('ghi chú') || header.includes('ghi chu') || header === 'gc')
+      else if (
+        header.includes('ghi chú') ||
+        header.includes('ghi chu') ||
+        header === 'gc'
+      )
         columnMap.note = i;
     }
 
@@ -217,6 +279,7 @@ export class StandardWordParserService {
       return num;
     }
 
-    return Math.round(num * 10) / 10;
+    // Round to 2 decimal places
+    return Math.round(num * 100) / 100;
   }
 }

@@ -5,11 +5,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AcademicYearEntity } from 'src/database/entities/academic-years.entity';
-import { BuildingEntity } from 'src/database/entities/building.entity';
-import { ClassroomEntity } from 'src/database/entities/classrooms.entity';
 import { CourseEntity } from 'src/database/entities/course.entity';
 import { StandardEntity } from 'src/database/entities/standard.entity';
-import { TimeSlotEntity } from 'src/database/entities/timeslot.entity';
 import { KyHoc } from 'src/shared/enums/semester.enum';
 import {
   Between,
@@ -22,7 +19,6 @@ import {
 } from 'typeorm';
 import {
   CreateStandardDto,
-  StandardConflictCheckDto,
   StandardQueryDto,
   StandardUploadDataDto,
   StandardUploadDto,
@@ -45,7 +41,8 @@ export class StandardService {
     createStandardDto: CreateStandardDto,
     manager: EntityManager,
   ): Promise<StandardEntity> {
-    const { detailTimeSlots = [], ...standardData } = createStandardDto;
+    // Destructure to remove detailTimeSlots from standardData
+    const { detailTimeSlots, ...standardData } = createStandardDto;
 
     // Check for duplicate combination of className, semester, academicYearId
     const existingStandard = await manager.findOne(StandardEntity, {
@@ -62,214 +59,42 @@ export class StandardService {
       );
     }
 
-    // Batch check conflicts for real rooms only if detailTimeSlots is provided
-    const realRoomSlots = detailTimeSlots.filter((slot) =>
-      /^[0-9]/.test(slot.roomName),
-    );
-
-    if (realRoomSlots.length > 0) {
-      // Build a single query to check all conflicts at once
-      const conflictConditions = realRoomSlots.map((slot) => ({
-        roomName: slot.roomName,
-        buildingName: slot.buildingName || 'Chung',
-        dayOfWeek: slot.dayOfWeek,
-        timeSlot: slot.timeSlot,
-        startDate: slot.startDate,
-        endDate: slot.endDate,
-      }));
-
-      const conflicts = await this.batchCheckConflicts(
-        conflictConditions,
-        manager,
-      );
-      if (conflicts.length > 0) {
-        throw new ConflictException(
-          'Phòng học đã có lịch trùng với thời gian này',
-        );
-      }
-    }
-
-    // Save standard first
-    const standard = manager.create(StandardEntity, standardData);
-    const savedStandard = await manager.save(StandardEntity, standard);
-
-    if (detailTimeSlots.length === 0) {
-      return savedStandard;
-    }
-
-    // Prepare unique building and classroom names
-    const buildingClassroomMap = new Map<string, Set<string>>();
-
-    for (const slot of detailTimeSlots) {
-      const buildingName =
-        slot.buildingName && slot.buildingName.trim() !== ''
-          ? slot.buildingName.trim()
-          : 'Chung';
-      const roomName = slot.roomName.trim();
-
-      if (!buildingClassroomMap.has(buildingName)) {
-        buildingClassroomMap.set(buildingName, new Set());
-      }
-      buildingClassroomMap.get(buildingName)!.add(roomName);
-    }
-
-    // Batch load all needed buildings with classrooms
-    const buildingNames = Array.from(buildingClassroomMap.keys());
-    const existingBuildings = await manager.find(BuildingEntity, {
-      where: { name: In(buildingNames) },
-      relations: { classrooms: true },
-    });
-
-    const buildingMap = new Map<string, BuildingEntity>();
-    existingBuildings.forEach((b) => buildingMap.set(b.name, b));
-
-    // Prepare buildings and classrooms to insert
-    const buildingsToInsert: BuildingEntity[] = [];
-    const newClassroomsPerBuilding: Array<{
-      buildingName: string;
-      roomNames: string[];
-    }> = [];
-
-    for (const [buildingName, roomNames] of buildingClassroomMap) {
-      let building = buildingMap.get(buildingName);
-
-      if (!building) {
-        building = manager.create(BuildingEntity, { name: buildingName });
-        buildingsToInsert.push(building);
-        building.classrooms = [];
-      }
-
-      const existingRoomNames = new Set(
-        (building.classrooms || []).map((c) => c.name),
-      );
-
-      const newRoomNames: string[] = [];
-      for (const roomName of roomNames) {
-        if (!existingRoomNames.has(roomName)) {
-          newRoomNames.push(roomName);
-        }
-      }
-
-      if (newRoomNames.length > 0) {
-        newClassroomsPerBuilding.push({
-          buildingName,
-          roomNames: newRoomNames,
-        });
-      }
-
-      buildingMap.set(buildingName, building);
-    }
-
-    // First, batch insert new buildings to get their IDs
-    if (buildingsToInsert.length > 0) {
-      const savedBuildings = await manager.save(
-        BuildingEntity,
-        buildingsToInsert,
-      );
-      savedBuildings.forEach((b) => buildingMap.set(b.name, b));
-    }
-
-    // Now create and insert classrooms with proper building IDs
-    const classroomsToInsert: ClassroomEntity[] = [];
-    for (const { buildingName, roomNames } of newClassroomsPerBuilding) {
-      const building = buildingMap.get(buildingName)!;
-
-      for (const roomName of roomNames) {
-        const classroom = manager.create(ClassroomEntity, {
-          name: roomName,
-          type: buildingName === 'Chung' ? roomName : 'Phòng học',
-          buildingId: building.id,
-        });
-        classroomsToInsert.push(classroom);
-
-        if (!building.classrooms) {
-          building.classrooms = [];
-        }
-        building.classrooms.push(classroom);
-      }
-    }
-
-    if (classroomsToInsert.length > 0) {
-      await manager.save(ClassroomEntity, classroomsToInsert);
-    }
-
-    // Create classroom lookup map for quick access
-    const classroomLookup = new Map<string, string>();
-    for (const building of buildingMap.values()) {
-      for (const classroom of building.classrooms || []) {
-        const key = `${building.name}:${classroom.name}`;
-        classroomLookup.set(key, classroom.id);
-      }
-    }
-
-    // Batch create all timeslots
-    const timeSlotEntities = detailTimeSlots.map((slot) => {
-      const buildingName =
-        slot.buildingName && slot.buildingName.trim() !== ''
-          ? slot.buildingName.trim()
-          : 'Chung';
-      const classroomKey = `${buildingName}:${slot.roomName}`;
-
-      return manager.create(TimeSlotEntity, {
-        dayOfWeek: slot.dayOfWeek,
-        timeSlot: slot.timeSlot,
-        classroomId: classroomLookup.get(classroomKey),
-        startDate: new Date(slot.startDate),
-        endDate: new Date(slot.endDate),
-        timetableId: savedStandard.id, // Use standard ID for timeslots
+    // Validate relationships if IDs are provided
+    if (standardData.courseId) {
+      const course = await manager.findOne(CourseEntity, {
+        where: { id: standardData.courseId },
       });
-    });
-
-    // Batch insert all timeslots
-    const savedTimeSlots = await manager.save(TimeSlotEntity, timeSlotEntities);
-    savedStandard.timeSlots = savedTimeSlots;
-
-    return savedStandard;
-  }
-
-  private async batchCheckConflicts(
-    conflictChecks: StandardConflictCheckDto[],
-    manager: EntityManager,
-  ): Promise<TimeSlotEntity[]> {
-    if (conflictChecks.length === 0) return [];
-
-    // Build a complex OR condition for all conflict checks
-    const queryBuilder = manager
-      .createQueryBuilder(TimeSlotEntity, 'timeSlot')
-      .innerJoin('timeSlot.classroom', 'classroom')
-      .innerJoin('classroom.building', 'building');
-
-    const whereConditions: string[] = [];
-    const parameters: any = {};
-
-    conflictChecks.forEach((check, index) => {
-      if (check.buildingName === 'Chung') {
-        return;
+      if (!course) {
+        // Set to undefined if course doesn't exist
+        standardData.courseId = undefined;
       }
-
-      const condition = `(
-        classroom.name = :roomName${index} AND
-        building.name = :buildingName${index} AND
-        timeSlot.dayOfWeek = :dayOfWeek${index} AND
-        timeSlot.timeSlot = :timeSlot${index} AND
-        timeSlot.startDate <= :endDate${index} AND
-        timeSlot.endDate >= :startDate${index}
-      )`;
-
-      whereConditions.push(condition);
-      parameters[`roomName${index}`] = check.roomName;
-      parameters[`buildingName${index}`] = check.buildingName;
-      parameters[`dayOfWeek${index}`] = check.dayOfWeek;
-      parameters[`timeSlot${index}`] = check.timeSlot;
-      parameters[`startDate${index}`] = check.startDate;
-      parameters[`endDate${index}`] = check.endDate;
-    });
-
-    if (whereConditions.length > 0) {
-      queryBuilder.where(`(${whereConditions.join(' OR ')})`, parameters);
     }
 
-    return await queryBuilder.getMany();
+    if (standardData.academicYearId) {
+      const academicYear = await manager.findOne(AcademicYearEntity, {
+        where: { id: standardData.academicYearId },
+      });
+      if (!academicYear) {
+        // Set to undefined if academic year doesn't exist
+        standardData.academicYearId = undefined;
+      }
+    }
+
+    // Calculate standardHours if all required fields are present
+    if (
+      standardData.actualHours &&
+      standardData.crowdClassCoefficient &&
+      standardData.overtimeCoefficient
+    ) {
+      standardData.standardHours =
+        standardData.actualHours *
+        standardData.crowdClassCoefficient *
+        standardData.overtimeCoefficient;
+    }
+
+    // Create and save standard
+    const standard = manager.create(StandardEntity, standardData);
+    return await manager.save(StandardEntity, standard);
   }
 
   async create(createStandardDto: CreateStandardDto): Promise<StandardEntity> {
@@ -326,7 +151,6 @@ export class StandardService {
       relations: {
         course: true,
         academicYear: true,
-        timeSlots: true,
       },
     });
 
@@ -367,7 +191,7 @@ export class StandardService {
         where: {
           className: duplicateCheckClassName,
           semester: duplicateCheckSemester,
-          academicYearId: duplicateCheckAcademicYearId,
+          academicYearId: duplicateCheckAcademicYearId || undefined,
           id: Not(id), // Exclude current standard
         },
       });
@@ -379,8 +203,8 @@ export class StandardService {
       }
     }
 
-    // Update crowd class coefficient if student count changes
-    if (studentCount && studentCount !== standard.studentCount) {
+    // Update student count and crowd class coefficient if student count changes
+    if (studentCount !== undefined && studentCount !== standard.studentCount) {
       standard.studentCount = studentCount;
       // Update HSLĐ based on student count
       switch (true) {
@@ -400,7 +224,7 @@ export class StandardService {
           standard.crowdClassCoefficient = 1.1;
           break;
         default:
-          standard.crowdClassCoefficient = 1;
+          standard.crowdClassCoefficient = 1.0;
       }
     }
 
@@ -433,12 +257,17 @@ export class StandardService {
       await Promise.all(entitiesToCheck);
     }
 
-    // Update standard hours if needed
+    // Update actual hours if provided
+    if (actualHours !== undefined) {
+      standard.actualHours = actualHours;
+    }
+
+    // Recalculate standard hours if all required fields are available
     if (
-      (actualHours && actualHours !== standard.actualHours) ||
-      (studentCount && studentCount !== standard.studentCount)
+      standard.actualHours &&
+      standard.crowdClassCoefficient &&
+      standard.overtimeCoefficient
     ) {
-      standard.actualHours = actualHours || standard.actualHours;
       standard.standardHours =
         standard.actualHours *
         standard.crowdClassCoefficient *
@@ -462,10 +291,12 @@ export class StandardService {
 
   async uploadFromWord(uploadDto: StandardUploadDto): Promise<{
     success: number;
+    skipped: number;
     errors: Array<{ row: number; data: StandardUploadDataDto; error: string }>;
   }> {
     const results = {
       success: 0,
+      skipped: 0,
       errors: [] as Array<{
         row: number;
         data: StandardUploadDataDto;
@@ -476,25 +307,56 @@ export class StandardService {
     await this.dataSource.transaction(async (manager) => {
       // Pre-load all needed data to minimize queries
       const courseCodeSet = new Set<string>();
-      const yearCodeSet = new Set<string>();
+      const courseNameSet = new Set<string>();
+      const yearIdSet = new Set<string>();
 
       for (const item of uploadDto.data) {
-        courseCodeSet.add(item.courseCode);
-        const yearCode = this.extractSchoolYear(item.startDate||"2025-10-27");
-        yearCodeSet.add(yearCode);
+        if (item.courseCode) {
+          courseCodeSet.add(item.courseCode);
+        }
+        if (item.academicYearId) {
+          yearIdSet.add(item.academicYearId);
+        }
+        // Extract course name for pre-loading
+        const courseName = item.className
+          .replace(/(-\d+-\d+.*|\(.*)$/, '')
+          .trim();
+        courseNameSet.add(courseName);
       }
 
       // Batch load existing courses and academic years
-      const [existingCourses, existingYears] = await Promise.all([
-        manager.find(CourseEntity, {
-          where: { courseCode: In(Array.from(courseCodeSet)) },
-        }),
-        manager.find(AcademicYearEntity, {
-          where: { yearCode: In(Array.from(yearCodeSet)) },
-        }),
-      ]);
+      const [existingCoursesByCodes, existingCoursesByNames, existingYears] =
+        await Promise.all([
+          courseCodeSet.size > 0
+            ? manager.find(CourseEntity, {
+                where: { courseCode: In(Array.from(courseCodeSet)) },
+              })
+            : Promise.resolve([]),
+          courseNameSet.size > 0
+            ? manager.find(CourseEntity, {
+                where: { courseName: In(Array.from(courseNameSet)) },
+                order: { createdAt: 'ASC' },
+              })
+            : Promise.resolve([]),
+          yearIdSet.size > 0
+            ? manager.find(AcademicYearEntity, {
+                where: { yearCode: In(Array.from(yearIdSet)) },
+              })
+            : Promise.resolve([]),
+        ]);
 
-      const courseMap = new Map(existingCourses.map((c) => [c.courseCode, c]));
+      const courseByCodeMap = new Map(
+        existingCoursesByCodes.map((c) => [c.courseCode, c]),
+      );
+      // Create a map for courses by name+semester+credits
+      const courseByNameMap = new Map<string, CourseEntity[]>();
+      existingCoursesByNames.forEach((c) => {
+        const key = `${c.courseName}|${c.semester}|${c.credits || 0}`;
+        if (!courseByNameMap.has(key)) {
+          courseByNameMap.set(key, []);
+        }
+        courseByNameMap.get(key)!.push(c);
+      });
       const yearMap = new Map(existingYears.map((y) => [y.yearCode, y]));
 
       // Prepare entities to batch insert
@@ -509,35 +371,77 @@ export class StandardService {
       // Process each row
       for (const [index, item] of uploadDto.data.entries()) {
         try {
-          const semester = this.getSemester(item.startDate, item.endDate);
-          const yearCode = this.extractSchoolYear(item.startDate);
-          const classType = item.classType.toUpperCase();
-
-          // Get or prepare course
-          let course = courseMap.get(item.courseCode);
-          if (!course) {
-            course = manager.create(CourseEntity, {
-              courseCode: item.courseCode,
-              courseName: item.className.replace(/-\d+-\d+.*$/, '').trim(),
-              credits: item.credits,
-              semester,
-            });
-            coursesToInsert.push(course);
-            courseMap.set(item.courseCode, course);
+          // Parse semester from item.semester string or calculate from dates
+          let semester: KyHoc;
+          if (item.semester) {
+            semester = this.parseSemesterString(item.semester);
+          } else if (item.startDate && item.endDate) {
+            semester = this.getSemester(item.startDate, item.endDate);
+          } else {
+            throw new Error('Thiếu thông tin kỳ học');
           }
 
-          // Get or prepare academic year
-          let year = yearMap.get(yearCode);
-          if (!year) {
-            year = manager.create(AcademicYearEntity, { yearCode });
-            yearsToInsert.push(year);
-            yearMap.set(yearCode, year);
+          let courseId: string | undefined;
+          let academicYearId: string | undefined;
+
+          // Extract course name from className
+          const courseName = item.className
+            .replace(/(-\d+-\d+.*|\(.*)$/, '')
+            .trim();
+
+          // Try to find existing course by courseName, semester, and credits
+          const courseKey = `${courseName}|${semester}|${item.credits || 0}`;
+          let course: CourseEntity | undefined;
+
+          // First, try to find in pre-loaded courses by name
+          const coursesByName = courseByNameMap.get(courseKey);
+          if (coursesByName && coursesByName.length > 0) {
+            course = coursesByName[0]; // Take the first one
+          }
+
+          // If not found by name and courseCode is provided, try by courseCode
+          if (!course && item.courseCode) {
+            course = courseByCodeMap.get(item.courseCode);
+            if (!course) {
+              // Create new course if not exists
+              course = manager.create(CourseEntity, {
+                courseCode: item.courseCode,
+                courseName,
+                credits: item.credits || 0,
+                semester,
+              });
+              coursesToInsert.push(course);
+              courseByCodeMap.set(item.courseCode, course);
+              // Also add to name map for future reference
+              if (!courseByNameMap.has(courseKey)) {
+                courseByNameMap.set(courseKey, []);
+              }
+              courseByNameMap.get(courseKey)!.push(course);
+            }
+          }
+
+          // Set courseId if course is found
+          if (course) {
+            courseId = course.id;
+          }
+
+          // Handle academic year - only if academicYearId is provided
+          if (item.academicYearId) {
+            let year = yearMap.get(item.academicYearId);
+            if (!year) {
+              year = manager.create(AcademicYearEntity, {
+                yearCode: item.academicYearId,
+              });
+              yearsToInsert.push(year);
+              yearMap.set(item.academicYearId, year);
+            }
+            academicYearId = year.id;
           }
 
           const createDto: CreateStandardDto = {
             className: item.className,
-            classType,
             semester,
+            classType: item.classType,
             studentCount: item.studentCount,
             theoryHours: item.theoryHours,
             crowdClassCoefficient: item.crowdClassCoefficient,
@@ -545,12 +449,10 @@ export class StandardService {
             overtimeCoefficient: item.overtimeCoefficient,
             standardHours: item.standardHours,
             lecturerName: item.lecturerName,
-            startDate: item.startDate ,
+            startDate: item.startDate,
             endDate: item.endDate,
-            detailTimeSlots: item.detailTimeSlots,
-            courseId: course.id,
-            academicYearId: year.id,
-            department: item.department
+            courseId,
+            academicYearId,
           };
 
           standardsToProcess.push({ index, data: item, dto: createDto });
@@ -566,7 +468,16 @@ export class StandardService {
       // Batch insert new courses and years
       if (coursesToInsert.length > 0) {
         const savedCourses = await manager.save(CourseEntity, coursesToInsert);
-        savedCourses.forEach((c) => courseMap.set(c.courseCode, c));
+        savedCourses.forEach((c) => {
+          if (c.courseCode) {
+            courseByCodeMap.set(c.courseCode, c);
+          }
+          const key = `${c.courseName}|${c.semester}|${c.credits || 0}`;
+          if (!courseByNameMap.has(key)) {
+            courseByNameMap.set(key, []);
+          }
+          courseByNameMap.get(key)!.push(c);
+        });
       }
 
       if (yearsToInsert.length > 0) {
@@ -577,23 +488,81 @@ export class StandardService {
         savedYears.forEach((y) => yearMap.set(y.yearCode, y));
       }
 
-      // Update IDs and create standards
+      // Update academicYearId first for all items
+      for (const { data, dto } of standardsToProcess) {
+        if (data.academicYearId && yearMap.has(data.academicYearId)) {
+          dto.academicYearId = yearMap.get(data.academicYearId)!.id;
+        }
+      }
+
+      // Batch check for existing standards to avoid duplicates
+      const existingStandardsMap = new Map<string, StandardEntity>();
+
+      if (standardsToProcess.length > 0) {
+        const standardsToCheck = standardsToProcess.map((item) => ({
+          className: item.dto.className,
+          semester: item.dto.semester,
+          academicYearId: item.dto.academicYearId,
+        }));
+
+        // Build query to check all at once
+        const existingStandards = await manager
+          .createQueryBuilder(StandardEntity, 'standard')
+          .where(
+            standardsToCheck
+              .map(
+                (_, i) =>
+                  `(standard.className = :className${i} AND standard.semester = :semester${i} AND standard.academicYearId ${standardsToCheck[i].academicYearId ? `= :academicYearId${i}` : 'IS NULL'})`,
+              )
+              .join(' OR '),
+            standardsToCheck.reduce(
+              (params, item, i) => ({
+                ...params,
+                [`className${i}`]: item.className,
+                [`semester${i}`]: item.semester,
+                ...(item.academicYearId
+                  ? { [`academicYearId${i}`]: item.academicYearId }
+                  : {}),
+              }),
+              {},
+            ),
+          )
+          .getMany();
+
+        // Map existing standards for quick lookup
+        existingStandards.forEach((standard) => {
+          const key = `${standard.className}|${standard.semester}|${standard.academicYearId || 'null'}`;
+          existingStandardsMap.set(key, standard);
+        });
+      }
+
+      // Create standards (skip if exists)
       for (const { index, data, dto } of standardsToProcess) {
         try {
-          // Update with actual saved IDs
-          dto.courseId = courseMap.get(data.courseCode)!.id;
-          dto.academicYearId = yearMap.get(
-            this.extractSchoolYear(data.startDate),
-          )!.id;
+          // Check if already exists
+          const existingKey = `${dto.className}|${dto.semester}|${dto.academicYearId || 'null'}`;
+          if (existingStandardsMap.has(existingKey)) {
+            results.skipped++;
+            continue; // Skip this record
+          }
 
           await this.createWithManager(dto, manager);
           results.success++;
         } catch (error: any) {
-          results.errors.push({
-            row: index + 1,
-            data,
-            error: error.message,
-          });
+          // Check if it's a duplicate key error (backup check)
+          if (
+            error.code === '23505' ||
+            error.message?.includes('duplicate') ||
+            error.message?.includes('already exists')
+          ) {
+            results.skipped++;
+          } else {
+            results.errors.push({
+              row: index + 1,
+              data,
+              error: error.message,
+            });
+          }
         }
       }
     });
@@ -601,27 +570,34 @@ export class StandardService {
     return results;
   }
 
-  private extractSchoolYear(startDate: string): string {
-    const date = new Date(startDate);
-    if (isNaN(date.getTime())) {
-      throw new Error(`Invalid date format: ${startDate}`);
+  private parseSemesterString(semesterStr: string): KyHoc {
+    const normalized = semesterStr.toLowerCase().trim();
+
+    if (normalized.includes('1.1') || normalized.includes('học kỳ 1.1')) {
+      return KyHoc.KI_1_1;
+    } else if (
+      normalized.includes('1.2') ||
+      normalized.includes('học kỳ 1.2')
+    ) {
+      return KyHoc.KI_1_2;
+    } else if (
+      normalized.includes('2.1') ||
+      normalized.includes('học kỳ 2.1')
+    ) {
+      return KyHoc.KI_2_1;
+    } else if (
+      normalized.includes('2.2') ||
+      normalized.includes('học kỳ 2.2')
+    ) {
+      return KyHoc.KI_2_2;
+    } else if (normalized.includes('kỳ 1') || normalized.includes('học kỳ 1')) {
+      return KyHoc.KI_1_1;
+    } else if (normalized.includes('kỳ 2') || normalized.includes('học kỳ 2')) {
+      return KyHoc.KI_2_1;
     }
 
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-
-    let startYear: number;
-    let endYear: number;
-
-    if (month >= 8 && month <= 12) {
-      startYear = year;
-      endYear = year + 1;
-    } else {
-      startYear = year - 1;
-      endYear = year;
-    }
-
-    return `${startYear}-${endYear}`;
+    // Default to KI_1_1 if cannot parse
+    return KyHoc.KI_1_1;
   }
 
   private getSemester(startDateStr: string, endDateStr: string): KyHoc {

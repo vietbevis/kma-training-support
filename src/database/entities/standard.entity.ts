@@ -1,18 +1,10 @@
 import { ApiHideProperty } from '@nestjs/swagger';
 import { Exclude, Type } from 'class-transformer';
 import { KyHoc } from 'src/shared/enums/semester.enum';
-import {
-  Column,
-  Entity,
-  JoinColumn,
-  ManyToOne,
-  OneToMany,
-  Unique,
-} from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, Unique } from 'typeorm';
 import { AuditableEntity } from '../base/auditable.entity';
 import { AcademicYearEntity } from './academic-years.entity';
 import { CourseEntity } from './course.entity';
-import { TimeSlotEntity } from './timeslot.entity';
 
 @Entity('tbl_standards')
 @Unique(['className', 'semester', 'academicYearId'])
@@ -35,25 +27,30 @@ export class StandardEntity extends AuditableEntity {
 
   @Column({
     name: 'class_type',
+    type: 'varchar',
+    length: 100,
     comment: 'Hình thức học (LT, TH, BT...)',
+    nullable: true,
   })
-  classType!: string;
+  classType?: string | null;
 
   @Column({
     name: 'student_count',
     type: 'int',
     default: 0,
     comment: 'Số sinh viên đăng ký',
+    nullable: true,
   })
-  studentCount!: number;
+  studentCount?: number;
 
   @Column({
     name: 'theory_hours',
     type: 'int',
     default: 0,
     comment: 'LL',
+    nullable: true,
   })
-  theoryHours!: number;
+  theoryHours?: number;
 
   @Column({
     name: 'crowd_class_coefficient',
@@ -62,16 +59,18 @@ export class StandardEntity extends AuditableEntity {
     scale: 2,
     default: 1.0,
     comment: 'Hệ số lớp đông',
+    nullable: true,
   })
-  crowdClassCoefficient!: number;
+  crowdClassCoefficient?: number;
 
   @Column({
     name: 'actual_hours',
     type: 'int',
     default: 0,
     comment: 'LL thực',
+    nullable: true,
   })
-  actualHours!: number;
+  actualHours?: number;
 
   @Column({
     name: 'overtime_coefficient',
@@ -80,8 +79,9 @@ export class StandardEntity extends AuditableEntity {
     scale: 2,
     default: 0,
     comment: 'Hệ số ngoài giờ',
+    nullable: true,
   })
-  overtimeCoefficient!: number;
+  overtimeCoefficient?: number;
 
   @Column({
     name: 'standard_hours',
@@ -90,22 +90,25 @@ export class StandardEntity extends AuditableEntity {
     scale: 2,
     default: 0,
     comment: 'Số tiết quy chuẩn',
+    nullable: true,
   })
-  standardHours!: number;
+  standardHours?: number;
 
   @Column({
     name: 'start_date',
     type: 'date',
     comment: 'Ngày bắt đầu',
+    nullable: true,
   })
-  startDate!: Date;
+  startDate?: Date | null;
 
   @Column({
     name: 'end_date',
     type: 'date',
     comment: 'Ngày kết thúc',
+    nullable: true,
   })
-  endDate!: Date;
+  endDate?: Date | null;
 
   @Column({
     name: 'lecturer_name',
@@ -117,34 +120,31 @@ export class StandardEntity extends AuditableEntity {
   lecturerName?: string;
 
   // Relations
-  @OneToMany(() => TimeSlotEntity, (timeSlot) => timeSlot.timetable, {
-    cascade: true,
-    eager: false,
-  })
-  timeSlots!: TimeSlotEntity[];
   @Exclude()
   @ApiHideProperty()
   @Column({
     name: 'course_id',
     comment: 'ID học phần',
+    nullable: true,
   })
-  courseId!: string;
+  courseId?: string | null;
 
   @Type(() => CourseEntity)
-  @ManyToOne(() => CourseEntity, { eager: true })
+  @ManyToOne(() => CourseEntity, { eager: true, nullable: true })
   @JoinColumn({ name: 'course_id' })
-  course!: CourseEntity;
+  course?: CourseEntity | null;
 
   @Exclude()
   @ApiHideProperty()
   @Column({
     name: 'academic_year_id',
     comment: 'ID năm học',
+    nullable: true,
   })
-  academicYearId!: string;
+  academicYearId?: string | null;
 
   @Type(() => AcademicYearEntity)
-  @ManyToOne(() => AcademicYearEntity, { eager: true })
+  @ManyToOne(() => AcademicYearEntity, { eager: true, nullable: true })
   @JoinColumn({ name: 'academic_year_id' })
-  academicYear!: AcademicYearEntity;
+  academicYear?: AcademicYearEntity | null;
 }

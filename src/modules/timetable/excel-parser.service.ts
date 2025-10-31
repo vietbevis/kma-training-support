@@ -281,7 +281,7 @@ export class ExcelParserService {
     }
 
     // Nếu là số thập phân -> lấy 1 số sau dấu phẩy
-    return Math.round(num * 10) / 10;
+    return Math.round(num * 100) / 100;
   }
 
   // chuyển ngày đọc từ excel về định dạng yyyy-MM-dd
