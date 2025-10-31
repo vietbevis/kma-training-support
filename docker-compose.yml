@@ -30,7 +30,7 @@ services:
       - '5432:5432'
     #  gắn một thư mục (volume) để lưu dữ liệu ra ngoài container -> khi container xóa thì dữ liệu vẫn còn
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/
 
 volumes:
   pgdata:

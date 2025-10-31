@@ -1,113 +1,224 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
-import * as XLSX from 'xlsx';
+import { Injectable } from '@nestjs/common';
+import * as mammoth from 'mammoth';
+import { JSDOM } from 'jsdom';
 import { StandardUploadDataDto } from './standard.dto';
 
 @Injectable()
 export class StandardWordParserService {
-  async parseWordFile(buffer: Buffer): Promise<StandardUploadDataDto[]> {
+  async parseWordFile(fileBuffer: Buffer): Promise<StandardUploadDataDto[]> {
     try {
-      const workbook = XLSX.read(buffer, { type: 'buffer' });
-      const sheetName = workbook.SheetNames[0];
+      const result = await mammoth.convertToHtml({ buffer: fileBuffer });
+      const html = result.value;
+      return this.parseHtmlTable(html);
+    } catch (error) {
+      throw new Error(`Lỗi khi đọc file Word: ${error.message}`);
+    }
+  }
 
-      if (!sheetName) {
-        throw new BadRequestException('File Excel không có sheet nào');
-      }
+  private parseHtmlTable(html: string): StandardUploadDataDto[] {
+    const result: StandardUploadDataDto[] = [];
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
 
-      const worksheet = workbook.Sheets[sheetName];
-      const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    // Lấy tất cả các bảng
+    const tables = document.querySelectorAll('table');
 
-      if (!data || data.length < 2) {
-        throw new BadRequestException(
-          'File Excel không có dữ liệu hoặc thiếu header',
-        );
-      }
+    console.log('First 1000 chars:', html.substring(400, 450));
 
-      // Bỏ qua header row (row đầu tiên)
-      const dataRows = data.slice(1) as any[][];
-      const parsedData: StandardUploadDataDto[] = [];
+    const text = "p học phần thuộc học kỳ 2, năm học 2024 – 2025</st";
 
-      for (let i = 0; i < dataRows.length; i++) {
-        const row = dataRows[i];
+    // Regex tìm "học kỳ <số>" và "năm học <năm> – <năm>"
+    const regex = /học kỳ\s*(\d+).*?năm học\s*(\d{4})\s*[–-]\s*(\d{4})/i;
 
-        // Bỏ qua các row trống
-        if (!row || row.length === 0 || !row[0]) {
-          continue;
+    const match = text.match(regex);
+ 
+    // console.log("match@@@@@@@@", );
+
+    if (tables.length === 0) {
+      throw new Error('Không tìm thấy bảng trong file Word');
+    }
+
+    // Lấy bảng lớn nhất (có nhiều dòng nhất)
+    let mainTable = tables[tables.length - 1];
+    if (tables.length > 1) {
+      let maxRows = 0;
+      tables.forEach((table, i) => {
+        const rowCount = table.querySelectorAll('tr').length;
+        if (rowCount > maxRows) {
+          maxRows = rowCount;
+          mainTable = table;
         }
+      });
+    }
 
-        try {
-          const standardData: StandardUploadDataDto = {
-            order: i + 1,
-            courseCode: this.getCellValue(row[0]),
-            credits: parseInt(this.getCellValue(row[1])) || 3,
-            className: this.getCellValue(row[2]),
-            classType: this.getCellValue(row[3]) || 'LT',
-            studentCount: parseInt(this.getCellValue(row[4])) || 0,
-            theoryHours: parseInt(this.getCellValue(row[5])) || 0,
-            actualHours: parseFloat(this.getCellValue(row[6])) || 0,
-            crowdClassCoefficient: parseFloat(this.getCellValue(row[7])) || 1.0,
-            overtimeCoefficient: parseFloat(this.getCellValue(row[8])) || 1.0,
-            standardHours: parseFloat(this.getCellValue(row[9])) || 0,
-            startDate: this.parseDate(this.getCellValue(row[10])),
-            endDate: this.parseDate(this.getCellValue(row[11])),
-            lecturerName: this.getCellValue(row[12]) || undefined,
-            // detailTimeSlots sẽ được xử lý sau nếu cần
-            detailTimeSlots: undefined,
-          };
+    const rows = Array.from(mainTable.querySelectorAll('tr'));
 
-          // Validate required fields
-          if (!standardData.courseCode || !standardData.className) {
-            throw new Error(
-              `Row ${i + 2}: Thiếu thông tin mã học phần hoặc tên lớp`,
-            );
+    let headerRowIndex = -1;
+
+    // Fallback: Tìm dòng có nhiều cột nhất
+    if (headerRowIndex === -1) {
+      let maxCols = 0;
+      for (let i = 0; i < rows.length; i++) {
+        const colCount = rows[i].querySelectorAll('td, th').length;
+        if (colCount > maxCols && colCount >= 10) {
+          maxCols = colCount;
+          headerRowIndex = i;
+        }
+      }
+      if (headerRowIndex === -1) {
+        console.error('Không thể tìm header row. Cấu trúc 15 dòng đầu:');
+        for (let i = 0; i < Math.min(15, rows.length); i++) {
+          const cells = rows[i].querySelectorAll('td, th');
+          const texts = Array.from(cells).map(c => c.textContent?.trim());
+          console.log(`Dòng ${i}: ${cells.length} cột -`, texts.slice(0, 5).join(' | '));
+        }
+        throw new Error('Không tìm thấy header trong bảng');
+      }
+    }
+
+    // Map columns
+    const headerCells = Array.from(rows[headerRowIndex].querySelectorAll('td, th'));
+    const headerTexts = headerCells.map(cell => cell.textContent?.trim() || '');
+    const columnMap = this.mapColumns(headerTexts);
+
+    let currentCourse: StandardUploadDataDto | null = null;
+    let currentSection = '';
+    let currentDepartment = '';
+    let processedCount = 0;
+
+    // Parse data rows
+    for (let i = headerRowIndex + 1; i < rows.length; i++) {
+      const cells = Array.from(rows[i].querySelectorAll('td, th'));
+
+      if (cells.length === 0) continue;
+
+      const rowData = cells.map(cell => cell.textContent?.trim() || '');
+      const fullRowText = rowData.join(' ').trim();
+
+      // Skip empty rows
+      if (!fullRowText || fullRowText.length < 5) continue;
+
+      // Kiểm tra section header
+      const sectionMatch = fullRowText.match(/^([IVX]+)\.\s*(.+)/);
+      if (sectionMatch) {
+        currentSection = fullRowText;
+        const deptMatch = fullRowText.match(/Khoa\s+([A-ZĐÁÀẢÃẠÂẤẦẨẪẬĂẮẰẲẴẶÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴ&\s]+)/i);
+        if (deptMatch) {
+          currentDepartment = `${deptMatch[1].trim()}`;
+        } else {
+          const specialMatch = fullRowText.match(/thuộc\s+(.+)$/i);
+          if (specialMatch) {
+            currentDepartment = specialMatch[1].trim();
+          } else {
+            currentDepartment = currentSection;
           }
-
-          parsedData.push(standardData);
-        } catch (error: any) {
-          throw new BadRequestException(
-            `Lỗi tại row ${i + 2}: ${error.message}`,
-          );
         }
+        if (currentCourse) {
+          result.push(currentCourse);
+          currentCourse = null;
+        }
+        continue;
       }
 
-      if (parsedData.length === 0) {
-        throw new BadRequestException(
-          'Không có dữ liệu hợp lệ trong file Excel',
-        );
-      }
+      const className = this.cleanText(rowData[columnMap.className] || '');
+      const lecturerName = this.cleanText(rowData[columnMap.lecturerName] || '');
 
-      return parsedData;
-    } catch (error: any) {
-      if (error instanceof BadRequestException) {
-        throw error;
+      // Chỉ tạo course mới nếu có className
+      if (className && className.length > 3) {
+        if (currentCourse) {
+          result.push(currentCourse);
+          processedCount++;
+        }
+        currentCourse = {
+          credits: this.parseNumber(rowData[columnMap.credits]),
+          className: this.getPureClassName(className),
+          semester: match ? `Học kỳ ${match[1]}` : "",
+          academicYearId: match ? `${match[2]}-${match[3]}` : "undefined",
+          lecturerName: lecturerName || '',
+          studentCount: this.parseNumber(rowData[columnMap.studentCount]),
+          theoryHours: this.parseNumber(rowData[columnMap.theoryHours]),
+          actualHours: this.parseNumber(rowData[columnMap.actualHours]),
+          overtimeCoefficient: this.parseNumber(rowData[columnMap.overtimeCoefficient]),
+          crowdClassCoefficient: this.parseNumber(rowData[columnMap.crowdClassCoefficient]),
+          standardHours: this.parseNumber(rowData[columnMap.standardHours]),
+          courseCode: '',
+          classType: '',
+          startDate: '',
+          endDate: '',
+          detailTimeSlots: [],
+          department: currentDepartment,
+          note: rowData[columnMap.note],
+        };
       }
-      throw new BadRequestException(`Lỗi đọc file Excel: ${error.message}`);
     }
+    if (currentCourse) {
+      result.push(currentCourse);
+      processedCount++;
+    }
+    return result;
   }
 
-  private getCellValue(cell: any): string {
-    if (cell === null || cell === undefined) {
-      return '';
+  private mapColumns(headerRow: string[]): Record<string, number> {
+    const columnMap: Record<string, number> = {};
+
+    for (let i = 0; i < headerRow.length; i++) {
+      const header = this.cleanText(headerRow[i]).toLowerCase();
+
+      // Flexible matching với nhiều từ khóa
+      if (header.includes('số tc') || header.includes('so tc') || header.includes('tín chỉ') || header.includes('tin chi'))
+        columnMap.credits = i;
+      else if (header.includes('lớp học phần') || header.includes('lop hoc phan') || header.includes('tên lớp'))
+        columnMap.className = i;
+      else if (header.includes('giáo viên') || header.includes('giao vien') || header.includes('giảng viên') || header.includes('gv'))
+        columnMap.lecturerName = i;
+      else if ((header.includes('số') || header.includes('so')) && header.includes('sv'))
+        columnMap.studentCount = i;
+      else if (header.includes('số tiết theo') || header.includes('so tiet theo') || header.includes('ctđt') || header.includes('ctdt'))
+        columnMap.theoryHours = i;
+      else if (header.includes('số tiết lên') || header.includes('so tiet len') || (header.includes('tiết') && header.includes('lên lớp')))
+        columnMap.actualHours = i;
+      else if (header.includes('hệ số lên') || header.includes('he so len') || (header.includes('ngoài') && header.includes('giờ')))
+        columnMap.overtimeCoefficient = i;
+      else if (header.includes('hệ số lớp') || header.includes('he so lop') || header.includes('lớp đông') || header.includes('lop dong'))
+        columnMap.crowdClassCoefficient = i;
+      else if (header.includes('quy chuẩn') || header.includes('quy chuan') || header === 'qc')
+        columnMap.standardHours = i;
+      else if (header.includes('ghi chú') || header.includes('ghi chu') || header === 'gc')
+        columnMap.note = i;
     }
-    return String(cell).trim();
+
+    return columnMap;
   }
 
-  private parseDate(dateStr: string): string {
-    if (!dateStr) {
-      throw new Error('Ngày không hợp lệ');
+  private cleanText(text: string): string {
+    return text
+      .normalize('NFC')
+      .replace(/\s+/g, ' ')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .trim();
+  }
+
+  private getPureClassName(className: string): string {
+    if (!className) return '';
+    return className.trim();
+  }
+
+  private parseNumber(value: any): number {
+    if (value === null || value === undefined || value === '') {
+      return 0;
     }
 
-    // Nếu là số (Excel date serial number)
-    if (!isNaN(Number(dateStr))) {
-      const date = XLSX.SSF.parse_date_code(Number(dateStr));
-      return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+    const cleanValue = String(value)
+      .replace(/[^\d.,]/g, '')
+      .replace(',', '.');
+
+    const num = Number(cleanValue);
+    if (isNaN(num)) return 0;
+
+    if (Number.isInteger(num)) {
+      return num;
     }
 
-    // Nếu là string date
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) {
-      throw new Error(`Định dạng ngày không hợp lệ: ${dateStr}`);
-    }
-
-    return date.toISOString().split('T')[0];
+    return Math.round(num * 10) / 10;
   }
 }

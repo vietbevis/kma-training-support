@@ -583,7 +583,6 @@ export class TimetableService {
           dto.academicYearId = yearMap.get(
             this.extractSchoolYear(data.startDate),
           )!.id;
-
           await this.createWithManager(dto, manager);
           results.success++;
         } catch (error: any) {

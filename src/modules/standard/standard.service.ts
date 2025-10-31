@@ -480,7 +480,7 @@ export class StandardService {
 
       for (const item of uploadDto.data) {
         courseCodeSet.add(item.courseCode);
-        const yearCode = this.extractSchoolYear(item.startDate);
+        const yearCode = this.extractSchoolYear(item.startDate||"2025-10-27");
         yearCodeSet.add(yearCode);
       }
 
@@ -545,11 +545,12 @@ export class StandardService {
             overtimeCoefficient: item.overtimeCoefficient,
             standardHours: item.standardHours,
             lecturerName: item.lecturerName,
-            startDate: item.startDate,
+            startDate: item.startDate ,
             endDate: item.endDate,
             detailTimeSlots: item.detailTimeSlots,
             courseId: course.id,
             academicYearId: year.id,
+            department: item.department
           };
 
           standardsToProcess.push({ index, data: item, dto: createDto });

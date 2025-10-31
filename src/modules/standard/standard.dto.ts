@@ -125,6 +125,24 @@ export class CreateStandardDto {
   @ApiProperty({ description: 'ID năm học' })
   @IsUUID()
   academicYearId!: string;
+
+  // ========== THÊM 2 TRƯỜNG MỚI ==========
+  @ApiPropertyOptional({
+    description: 'Tiêu đề section',
+    example: 'I. Các học phần thuộc Khoa CB'
+  })
+  @IsOptional()
+  @IsString()
+  sectionTitle?: string;
+
+  @ApiPropertyOptional({
+    description: 'Tên khoa/bộ môn',
+    example: 'Khoa CB'
+  })
+  @IsOptional()
+  @IsString()
+  department?: string;
+  // ========================================
 }
 
 export class UpdateStandardDto extends PartialType(
@@ -133,7 +151,7 @@ export class UpdateStandardDto extends PartialType(
     'standardHours',
     'detailTimeSlots',
   ] as const),
-) {}
+) { }
 
 export class StandardQueryDto {
   @ApiPropertyOptional({ description: 'ID học phần' })
@@ -171,6 +189,16 @@ export class StandardQueryDto {
   @IsString()
   lecturerName?: string;
 
+  // ========== THÊM FILTER THEO DEPARTMENT ==========
+  @ApiPropertyOptional({
+    description: 'Tìm kiếm theo khoa/bộ môn',
+    example: 'Khoa CB'
+  })
+  @IsOptional()
+  @IsString()
+  department?: string;
+  // =================================================
+
   @ApiPropertyOptional({ description: 'Số trang', default: 1 })
   @IsOptional()
   @Type(() => Number)
@@ -189,10 +217,10 @@ export class StandardQueryDto {
 
 // DTO cho upload Excel quy chuẩn
 export class StandardUploadDataDto {
-  @ApiProperty({ description: 'Số thứ tự' })
-  @IsInt()
-  @Min(1)
-  order!: number;
+  // @ApiProperty({ description: 'Số thứ tự' })
+  // @IsInt()
+  // @Min(1)
+  // order!: number;
 
   @ApiProperty({ description: 'Mã học phần' })
   @IsString()
@@ -257,6 +285,34 @@ export class StandardUploadDataDto {
   @IsOptional()
   @IsString()
   lecturerName?: string;
+
+  // ========== THÊM TRƯỜNG MỚI ==========
+  @ApiPropertyOptional({
+    description: 'Tên khoa/bộ môn được parse từ sectionTitle',
+    example: 'Khoa CB'
+  })
+  @IsOptional()
+  @IsString()
+  department?: string;
+
+  @ApiPropertyOptional({
+    description: 'Ghi chú',
+    example: 'Ghi chú'
+  })
+  
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @ApiProperty({ description: 'Kỳ học' })
+  @IsString()
+  semester!: string;
+
+  @ApiPropertyOptional({ description: 'ID năm học' })
+  @IsOptional()
+  @IsUUID()
+  academicYearId?: string;
+  // ========================================
 }
 
 export class StandardUploadDto {
