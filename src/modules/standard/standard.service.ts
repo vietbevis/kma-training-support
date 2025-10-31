@@ -124,7 +124,9 @@ export class StandardService {
             : undefined,
       },
       relations: {
-        course: true,
+        course: {
+          facultyDepartment: true,
+        },
         academicYear: true,
       },
       skip,
@@ -149,7 +151,9 @@ export class StandardService {
     const standard = await this.standardRepository.findOne({
       where: { id },
       relations: {
-        course: true,
+        course: {
+          facultyDepartment: true,
+        },
         academicYear: true,
       },
     });

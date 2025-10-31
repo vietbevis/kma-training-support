@@ -52,7 +52,7 @@ export class CourseEntity extends AuditableEntity {
   facultyDepartmentId!: string | null;
 
   @Type(() => FacultyDepartmentEntity)
-  @ManyToOne(() => FacultyDepartmentEntity)
+  @ManyToOne(() => FacultyDepartmentEntity, { eager: true })
   @JoinColumn({ name: 'faculty_department_id' })
   facultyDepartment!: FacultyDepartmentEntity;
 
