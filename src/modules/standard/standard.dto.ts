@@ -74,12 +74,12 @@ export class CreateStandardDto {
   @ApiPropertyOptional({ description: 'Ngày bắt đầu' })
   @IsOptional()
   @IsDateString()
-  startDate?: string;
+  startDate?: Date | string | null | undefined;
 
   @ApiPropertyOptional({ description: 'Ngày kết thúc' })
   @IsOptional()
   @IsDateString()
-  endDate?: string;
+  endDate?: Date | string | null | undefined;
 
   @ApiPropertyOptional({ description: 'Tên giảng viên' })
   @IsOptional()

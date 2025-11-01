@@ -673,10 +673,6 @@ export class TimetableService {
         where: {
           isStandard: false,
         },
-        relations: {
-          course: true,
-          academicYear: true,
-        },
       });
 
       for (const timetable of timetables) {
@@ -698,23 +694,6 @@ export class TimetableService {
             continue;
           }
 
-          // Helper function để convert date sang string format yyyy-MM-dd
-          const formatDateToString = (date: Date | string | null | undefined): string | undefined => {
-            if (!date) return undefined;
-            if (typeof date === 'string') {
-              // Nếu đã là string, kiểm tra format và return
-              // Có thể là 'yyyy-MM-dd' hoặc cần parse
-              if (date.includes('T')) {
-                return date.split('T')[0];
-              }
-              return date;
-            }
-            if (date instanceof Date) {
-              return date.toISOString().split('T')[0];
-            }
-            return undefined;
-          };
-
           // Tạo CreateStandardDto từ timetable
           const createStandardDto: CreateStandardDto = {
             className: timetable.className,
@@ -726,8 +705,8 @@ export class TimetableService {
             actualHours: timetable.actualHours,
             overtimeCoefficient: timetable.overtimeCoefficient,
             standardHours: timetable.standardHours,
-            startDate: formatDateToString(timetable.startDate),
-            endDate: formatDateToString(timetable.endDate),
+            startDate: timetable.startDate,
+            endDate: timetable.endDate,
             lecturerName: timetable.lecturerName,
             courseId: timetable.courseId || undefined,
             academicYearId: timetable.academicYearId || undefined,
