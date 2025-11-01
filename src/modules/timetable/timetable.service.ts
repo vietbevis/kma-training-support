@@ -3,13 +3,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { AcademicYearEntity } from 'src/database/entities/academic-years.entity';
 import { BuildingEntity } from 'src/database/entities/building.entity';
 import { ClassroomEntity } from 'src/database/entities/classrooms.entity';
 import { CourseEntity } from 'src/database/entities/course.entity';
+import { StandardEntity } from 'src/database/entities/standard.entity';
 import { TimeSlotEntity } from 'src/database/entities/timeslot.entity';
 import { TimetableEntity } from 'src/database/entities/timetable.entity';
+import { CreateStandardDto } from 'src/modules/standard/standard.dto';
 import { KyHoc } from 'src/shared/enums/semester.enum';
 import {
   Between,
@@ -38,6 +40,9 @@ export class TimetableService {
     private readonly courseRepository: Repository<CourseEntity>,
     @InjectRepository(AcademicYearEntity)
     private readonly academicYearRepository: Repository<AcademicYearEntity>,
+    @InjectRepository(StandardEntity)
+    private readonly standardRepository: Repository<StandardEntity>,
+    @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
 
@@ -645,5 +650,108 @@ export class TimetableService {
       default:
         return KyHoc.KI_2_2;
     }
+  }
+
+  async addToStandard(): Promise<{
+    success: number;
+    skipped: number;
+    errors: Array<{ timetableId: string; className: string; error: string }>;
+  }> {
+    const results = {
+      success: 0,
+      skipped: 0,
+      errors: [] as Array<{
+        timetableId: string;
+        className: string;
+        error: string;
+      }>,
+    };
+
+    return await this.dataSource.transaction(async (manager) => {
+      // Tìm tất cả timetables chưa được thêm vào standard
+      const timetables = await manager.find(TimetableEntity, {
+        where: {
+          isStandard: false,
+        },
+        relations: {
+          course: true,
+          academicYear: true,
+        },
+      });
+
+      for (const timetable of timetables) {
+        try {
+          // Kiểm tra xem standard đã tồn tại chưa
+          const existingStandard = await manager.findOne(StandardEntity, {
+            where: {
+              className: timetable.className,
+              semester: timetable.semester,
+              academicYearId: timetable.academicYearId || undefined,
+            },
+          });
+
+          if (existingStandard) {
+            // Nếu đã tồn tại, bỏ qua và đánh dấu isStandard = true
+            timetable.isStandard = true;
+            await manager.save(TimetableEntity, timetable);
+            results.skipped++;
+            continue;
+          }
+
+          // Helper function để convert date sang string format yyyy-MM-dd
+          const formatDateToString = (date: Date | string | null | undefined): string | undefined => {
+            if (!date) return undefined;
+            if (typeof date === 'string') {
+              // Nếu đã là string, kiểm tra format và return
+              // Có thể là 'yyyy-MM-dd' hoặc cần parse
+              if (date.includes('T')) {
+                return date.split('T')[0];
+              }
+              return date;
+            }
+            if (date instanceof Date) {
+              return date.toISOString().split('T')[0];
+            }
+            return undefined;
+          };
+
+          // Tạo CreateStandardDto từ timetable
+          const createStandardDto: CreateStandardDto = {
+            className: timetable.className,
+            semester: timetable.semester,
+            classType: timetable.classType,
+            studentCount: timetable.studentCount,
+            theoryHours: timetable.theoryHours,
+            crowdClassCoefficient: timetable.crowdClassCoefficient,
+            actualHours: timetable.actualHours,
+            overtimeCoefficient: timetable.overtimeCoefficient,
+            standardHours: timetable.standardHours,
+            startDate: formatDateToString(timetable.startDate),
+            endDate: formatDateToString(timetable.endDate),
+            lecturerName: timetable.lecturerName,
+            courseId: timetable.courseId || undefined,
+            academicYearId: timetable.academicYearId || undefined,
+          };
+
+          // Tạo standard entity
+          const standard = manager.create(StandardEntity, createStandardDto);
+          await manager.save(StandardEntity, standard);
+
+          // Đánh dấu timetable đã được thêm vào standard
+          timetable.isStandard = true;
+          await manager.save(TimetableEntity, timetable);
+
+          results.success++;
+        } catch (error: any) {
+          results.errors.push({
+            timetableId: timetable.id,
+            className: timetable.className,
+            error: error.message || 'Lỗi không xác định',
+          });
+        }
+      }
+
+      return results;
+    });
   }
 }

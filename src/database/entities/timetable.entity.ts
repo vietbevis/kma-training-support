@@ -116,6 +116,14 @@ export class TimetableEntity extends AuditableEntity {
   })
   lecturerName?: string;
 
+  @Column({
+    name: 'is_standard',
+    type: 'boolean',
+    default: false,
+    comment: 'Đã được thêm vào bảng quy chuẩn dự kiến',
+  })
+  isStandard!: boolean;
+
   // Relations
   @OneToMany(() => TimeSlotEntity, (timeSlot) => timeSlot.timetable, {
     cascade: true,

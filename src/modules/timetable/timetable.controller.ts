@@ -87,6 +87,17 @@ export class TimetableController {
     return await this.timetableService.uploadFromExcel(uploadDto);
   }
 
+  @Post('add-to-standard')
+  @ApiOperation({
+    summary: 'Thêm các bản ghi thời khóa biểu vào bảng quy chuẩn dự kiến',
+    description:
+      'Lấy tất cả các bản ghi trong timetable có isStandard = false và thêm vào bảng standard, sau đó đánh dấu isStandard = true',
+  })
+  @HttpCode(HttpStatus.CREATED)
+  async addToStandard() {
+    return await this.timetableService.addToStandard();
+  }
+
   @Get(':id')
   @ApiOperation({
     summary:

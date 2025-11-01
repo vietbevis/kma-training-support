@@ -5,6 +5,7 @@ import { BuildingEntity } from 'src/database/entities/building.entity';
 import { ClassroomEntity } from 'src/database/entities/classrooms.entity';
 import { CourseEntity } from 'src/database/entities/course.entity';
 import { FacultyDepartmentEntity } from 'src/database/entities/faculty-department.entity';
+import { StandardEntity } from 'src/database/entities/standard.entity';
 import { TimeSlotEntity } from 'src/database/entities/timeslot.entity';
 import { TimetableEntity } from 'src/database/entities/timetable.entity';
 import { UserEntity } from 'src/database/entities/user.entity';
@@ -23,6 +24,7 @@ import { TimetableService } from './timetable.service';
       ClassroomEntity,
       FacultyDepartmentEntity,
       UserEntity,
+      StandardEntity,
     ]),
   ],
   controllers: [TimetableController],
