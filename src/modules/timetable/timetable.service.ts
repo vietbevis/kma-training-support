@@ -14,11 +14,12 @@ import { TimetableEntity } from 'src/database/entities/timetable.entity';
 import { CreateStandardDto } from 'src/modules/standard/standard.dto';
 import { KyHoc } from 'src/shared/enums/semester.enum';
 import {
-  Between,
   DataSource,
   EntityManager,
   ILike,
   In,
+  LessThanOrEqual,
+  MoreThanOrEqual,
   Not,
   Repository,
 } from 'typeorm';
@@ -297,10 +298,12 @@ export class TimetableService {
         courseId: filters.courseId || undefined,
         academicYearId: filters.academicYearId || undefined,
         semester: filters.semester || undefined,
-        startDate:
-          filters.startDate && filters.endDate
-            ? Between(new Date(filters.startDate), new Date(filters.endDate))
-            : undefined,
+        startDate: filters.startDate
+          ? MoreThanOrEqual(new Date(filters.startDate))
+          : undefined,
+        endDate: filters.endDate
+          ? LessThanOrEqual(new Date(filters.endDate))
+          : undefined,
       },
       relations: {
         course: {
